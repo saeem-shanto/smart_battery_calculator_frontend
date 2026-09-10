@@ -1,0 +1,69 @@
+"use client";
+
+import { FormEvent, useEffect, useState } from "react";
+import { Eye, EyeOff, LockKeyhole, ShieldCheck, UserRound } from "lucide-react";
+import { BrandLogo } from "@/components/BrandLogo";
+
+export default function AdminLoginPage() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [working, setWorking] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("loggedOut") === "1") setError("");
+  }, []);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    const cleanUsername = username.trim();
+    if (!cleanUsername) return setError("Enter the admin username.");
+    if (!password) return setError("Enter the admin password.");
+    if (cleanUsername.length > 50) return setError("Username is too long.");
+    if (password.length > 100) return setError("Password is too long.");
+
+    setWorking(true);
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: cleanUsername, password }),
+      });
+      const payload = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error || "Admin login failed.");
+      window.location.replace("/admin");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Admin login failed.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return (
+    <main className="admin-login-page">
+      <section className="admin-login-card">
+        <BrandLogo />
+        <div className="admin-login-icon"><ShieldCheck size={30} /></div>
+        <h1>Admin Login</h1>
+        <p>Sign in to the separate administration dashboard.</p>
+        {error && <div className="error-box" role="alert"><strong>Login error</strong><span>{error}</span></div>}
+        <form onSubmit={submit} noValidate className="admin-login-form">
+          <div className="field">
+            <label htmlFor="admin-username">Username</label>
+            <div className="login-input-wrap"><UserRound size={18} /><input id="admin-username" className="input" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" placeholder="Admin username" disabled={working} /></div>
+          </div>
+          <div className="field">
+            <label htmlFor="admin-password">Password</label>
+            <div className="login-input-wrap"><LockKeyhole size={18} /><input id="admin-password" className="input" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" placeholder="Password" disabled={working} /><button type="button" className="password-toggle" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div>
+          </div>
+          <button className="btn btn-primary btn-lg admin-login-button" type="submit" disabled={working}>{working ? "Signing in..." : "Sign In"}</button>
+        </form>
+        <div className="admin-security-note"><LockKeyhole size={16}/><span>This is a development-only demo login. Replace the hard-coded credentials with real authentication before deployment.</span></div>
+        <a className="admin-back-link" href="/dashboard">← Back to user dashboard</a>
+      </section>
+    </main>
+  );
+}

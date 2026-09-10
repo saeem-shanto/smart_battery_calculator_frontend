@@ -1,0 +1,52 @@
+{
+  "tariffs": [
+    {
+      "id": "tou-3",
+      "type": "Time of Use (3 Periods)",
+      "provider": "Demo Energy",
+      "description": "Three-period time-of-use demonstration tariff.",
+      "peak": 0.45,
+      "shoulder": 0.28,
+      "offPeak": 0.16,
+      "feedIn": 0.06,
+      "demandCharge": 0,
+      "periods": {
+        "peak": "4pm – 9pm",
+        "shoulder": "7am – 4pm",
+        "offPeak": "9pm – 7am"
+      }
+    },
+    {
+      "id": "flat",
+      "type": "Flat Rate",
+      "provider": "Demo Energy",
+      "description": "One energy rate used throughout the day.",
+      "peak": 0.32,
+      "shoulder": 0.32,
+      "offPeak": 0.32,
+      "feedIn": 0.05,
+      "demandCharge": 0,
+      "periods": {
+        "peak": "All day",
+        "shoulder": "All day",
+        "offPeak": "All day"
+      }
+    },
+    {
+      "id": "solar-saver",
+      "type": "Solar Saver Demo",
+      "provider": "Solar Demo Co.",
+      "description": "Higher feed-in tariff and higher evening peak rate for demonstration.",
+      "peak": 0.48,
+      "shoulder": 0.31,
+      "offPeak": 0.18,
+      "feedIn": 0.08,
+      "demandCharge": 0,
+      "periods": {
+        "peak": "4pm – 9pm",
+        "shoulder": "7am – 4pm",
+        "offPeak": "9pm – 7am"
+      }
+    }
+  ]
+}
