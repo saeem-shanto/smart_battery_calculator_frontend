@@ -5,6 +5,7 @@ import { Camera, CheckCircle2, Eye, EyeOff, KeyRound, LogOut, Save, Trash2, User
 import { AppShell } from "@/components/AppShell";
 import { ProtectedAvatar } from "@/components/ProtectedAvatar";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { TwoFactorSettings } from "@/components/TwoFactorSettings";
 import {
   changePassword,
   getCurrentUser,
@@ -260,6 +261,8 @@ export default function ProfilePage() {
           <div className="profile-form-actions"><span className="profile-save-state">{profileChanged ? "Unsaved changes" : "Profile is up to date"}</span><button className="btn btn-primary" type="submit" disabled={savingProfile || !profileChanged}><Save size={17}/> {savingProfile?"Saving…":"Save Profile"}</button></div>
         </form>
       </section>
+
+      <TwoFactorSettings role="user" user={user} onUserChanged={(next)=>{ setUser(next); setProfile((current)=>({...current, email: next.email || ""})); setSavedProfile((current)=>({...current, email: next.email || ""})); }} />
 
       <section className="card page-card-space profile-card">
         <div className="card-header"><div><h2>Change Password</h2><p className="admin-card-subtitle">Changing your password signs out all existing account sessions.</p></div><KeyRound size={22}/></div>

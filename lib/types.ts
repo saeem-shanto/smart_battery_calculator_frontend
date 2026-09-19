@@ -188,6 +188,7 @@ export type UserSummary = {
   name: string;
   is_staff: boolean;
   avatar_download_path: string | null;
+  two_factor_enabled: boolean;
 };
 
 export type OwnedCalculation = {

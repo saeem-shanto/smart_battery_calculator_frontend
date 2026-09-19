@@ -124,11 +124,11 @@ export default function RegisterPage() {
 
   return (
     <AppShell>
-      <div className="page-header"><h1>Create Account</h1><p>Optional account for cross-session access to retained calculations.</p></div>
+      <div className="page-header"><h1>Create Account</h1><p>Optional account for cross-session access to retained calculations, password recovery and email security.</p></div>
       <section className="account-form-card account-form-card-wide">
         <div className="account-form-icon"><UserPlus size={28}/></div>
         <h2>Your account</h2>
-        <p className="account-form-intro">You can continue using the calculator as a guest. Create an account only if you want retained calculations linked to you across browser sessions.</p>
+        <p className="account-form-intro">You can continue using the calculator as a guest. Add an email if you want password recovery or optional email two-factor authentication.</p>
         {generalError && <div className="error-box" role="alert"><strong>Check your details</strong><span>{generalError}</span></div>}
         <form onSubmit={submit} className="account-form" noValidate>
           <div className="form-grid">
@@ -149,8 +149,9 @@ export default function RegisterPage() {
               {errorFor("username") && <div id="reg-username-error" className="field-message error" role="alert">{errorFor("username")}</div>}
             </div>
             <div className={`field${errorFor("email") ? " has-error" : ""}`}>
-              <label htmlFor="reg-email">Email <span className="optional-label">Optional</span></label>
-              <input id="reg-email" className={inputClass("email")} type="email" value={form.email} onChange={(e) => update("email", e.target.value)} autoComplete="email" maxLength={254} aria-invalid={Boolean(errorFor("email"))} aria-describedby={errorFor("email") ? "reg-email-error" : undefined}/>
+              <label htmlFor="reg-email">Email <span className="optional-label">Recommended</span></label>
+              <input id="reg-email" className={inputClass("email")} type="email" value={form.email} onChange={(e) => update("email", e.target.value)} autoComplete="email" maxLength={254} aria-invalid={Boolean(errorFor("email"))} aria-describedby={errorFor("email") ? "reg-email-error" : "reg-email-help"}/>
+              <div id="reg-email-help" className="field-help">Used for password recovery and optional login verification codes.</div>
               {errorFor("email") && <div id="reg-email-error" className="field-message error" role="alert">{errorFor("email")}</div>}
             </div>
             <div className={`field${errorFor("password") ? " has-error" : ""}`}>

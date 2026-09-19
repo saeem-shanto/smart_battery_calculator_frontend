@@ -1,6 +1,6 @@
-# Frontend v1.5.7 Production Summary
+# Frontend v1.5.8 Production Summary
 
-v1.5.7 is a full UI/UX refinement of the direct-Django frontend. It intentionally preserves the approved theme, layout, sidebar, page hierarchy, charts and Lucide icon language.
+v1.5.8 is a full UI/UX refinement of the direct-Django frontend. It intentionally preserves the approved theme, layout, sidebar, page hierarchy, charts and Lucide icon language.
 
 ## What changed
 - Calculator upload supports click/keyboard/drag-drop and clearer validation/removal state.
@@ -19,4 +19,4 @@ v1.5.7 is a full UI/UX refinement of the direct-Django frontend. It intentionall
 - User/admin shells include skip links; active nav uses `aria-current`; focus/reduced-motion behavior is improved.
 - Development debug overlay remains available without changing production UI.
 
-See `FRONTEND_UI_UX_REVIEW_v1.5.7.md` and `FRONTEND_V1.5.7_REGRESSION_CHECKLIST.md` for the detailed review/test matrix.
+See `FRONTEND_UI_UX_REVIEW_v1.5.8.md` and `FRONTEND_V1.5.8_REGRESSION_CHECKLIST.md` for the detailed review/test matrix.

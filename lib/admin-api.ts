@@ -10,8 +10,13 @@ import {
   publicFetch,
   saveAuthSession,
 } from "./backend-client";
+import { isTwoFactorChallengePayload, toChallengeInfo, type TwoFactorChallengeInfo } from "./security-api";
 
-type AdminAuthPayload = { access: string; refresh: string; user: UserSummary };
+type AdminAuthPayload = { two_factor_required?: false; access: string; refresh: string; user: UserSummary };
+
+export type AdminLoginResult =
+  | { twoFactorRequired: false; user: UserSummary }
+  | { twoFactorRequired: true; challenge: TwoFactorChallengeInfo };
 
 async function adminJson<T>(response: Response): Promise<T> {
   if (response.status === 401) {
@@ -21,15 +26,19 @@ async function adminJson<T>(response: Response): Promise<T> {
   return readJson<T>(response);
 }
 
-export async function loginAdmin(username: string, password: string) {
-  const payload = await readJson<AdminAuthPayload>(await publicFetch("/admin/auth/token/", {
+export async function loginAdmin(username: string, password: string): Promise<AdminLoginResult> {
+  const payload = await readJson<AdminAuthPayload | Record<string, unknown>>(await publicFetch("/admin/auth/token/", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
   }));
-  if (!payload.access || !payload.refresh) throw new Error("The backend returned an incomplete admin session.");
-  saveAuthSession("admin", { access: payload.access, refresh: payload.refresh });
-  return payload.user;
+  if (isTwoFactorChallengePayload(payload)) {
+    return { twoFactorRequired: true, challenge: toChallengeInfo(payload) };
+  }
+  const authenticated = payload as AdminAuthPayload;
+  if (!authenticated.access || !authenticated.refresh || !authenticated.user) throw new Error("The backend returned an incomplete admin session.");
+  saveAuthSession("admin", { access: authenticated.access, refresh: authenticated.refresh });
+  return { twoFactorRequired: false, user: authenticated.user };
 }
 
 export async function logoutAdmin() {

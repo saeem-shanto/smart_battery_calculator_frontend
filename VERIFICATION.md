@@ -1,4 +1,4 @@
-# Frontend v1.5.7 Verification
+# Frontend v1.5.8 Verification
 
 ## Architecture
 - Next.js remains frontend-only.

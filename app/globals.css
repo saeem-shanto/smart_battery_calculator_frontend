@@ -679,3 +679,20 @@ button:active:not(:disabled), .btn:active:not(:disabled) { transform: translateY
 .confirm-dialog .modal-header p{max-width:440px;line-height:1.55}
 .confirm-actions{justify-content:flex-end}
 .confirm-backdrop{z-index:1200}
+
+/* Email security: optional 2FA and password recovery */
+.otp-input { max-width: 230px; text-align: center; letter-spacing: .42em; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.two-factor-actions { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.two-factor-login-step > h2 { margin: 0; text-align: center; color: var(--navy); font-size: 25px; }
+.two-factor-login-step .success-box { display: flex; gap: 8px; }
+.security-card .card-header { padding: 22px 24px 16px; }
+.security-status-row { margin: 0 24px; padding: 13px 14px; display: flex; align-items: center; gap: 10px; border: 1px solid #e1e7ed; border-radius: 8px; background: #fafcfd; color: var(--muted); font-size: 12px; }
+.status-badge { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: .02em; }
+.status-badge.success { background: #e8f7ed; color: var(--green-dark); }
+.status-badge.muted { background: #edf1f4; color: #56677a; }
+.security-actions { flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .security-status-row { margin-left: 16px; margin-right: 16px; align-items: flex-start; flex-direction: column; }
+  .two-factor-actions .btn { flex: 1; }
+  .otp-input { max-width: 100%; }
+}

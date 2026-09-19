@@ -3,8 +3,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Eye, EyeOff, LockKeyhole, LogIn, UserRound } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { LoginTwoFactorStep } from "@/components/LoginTwoFactorStep";
 import { getCurrentUser, loginUser } from "@/lib/account-api";
 import { ApiRequestError, getApiFieldMessage } from "@/lib/api";
+import { resendTwoFactorCode, verifyLoginTwoFactor, type TwoFactorChallengeInfo } from "@/lib/security-api";
 
 type LoginField = "username" | "password";
 type LoginErrors = Partial<Record<LoginField, string>>;
@@ -27,6 +29,7 @@ export default function UserLoginPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [working, setWorking] = useState(false);
+  const [challenge, setChallenge] = useState<TwoFactorChallengeInfo | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -60,7 +63,12 @@ export default function UserLoginPage() {
     setFieldErrors({});
     setWorking(true);
     try {
-      await loginUser(username.trim(), password);
+      const result = await loginUser(username.trim(), password);
+      if (result.twoFactorRequired) {
+        setChallenge(result.challenge);
+        setPassword("");
+        return;
+      }
       window.dispatchEvent(new Event("smart-battery:user-changed"));
       const nextPath = new URLSearchParams(window.location.search).get("next");
       window.location.replace(nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/dashboard");
@@ -75,7 +83,8 @@ export default function UserLoginPage() {
           setFieldErrors(cleaned);
           focusField(cleaned.username ? "username" : "password");
         } else {
-          setError(caught.status === 401 ? "The username or password is incorrect. Please try again." : caught.message);
+          const securityMessage = getApiFieldMessage(caught, "email") || getApiFieldMessage(caught, "non_field_errors");
+          setError(caught.status === 401 ? "The username or password is incorrect. Please try again." : securityMessage || caught.message);
         }
       } else {
         setError(caught instanceof Error ? caught.message : "Sign in failed. Please try again.");
@@ -85,10 +94,39 @@ export default function UserLoginPage() {
     }
   }
 
+  async function verifyOtp(code: string) {
+    if (!challenge) return;
+    setWorking(true);
+    try {
+      await verifyLoginTwoFactor("user", challenge.challengeId, code);
+      window.dispatchEvent(new Event("smart-battery:user-changed"));
+      const nextPath = new URLSearchParams(window.location.search).get("next");
+      window.location.replace(nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/dashboard");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function resendOtp() {
+    if (!challenge) throw new Error("No active verification challenge.");
+    const next = await resendTwoFactorCode(challenge.challengeId);
+    setChallenge(next);
+    return next;
+  }
+
   return (
     <AppShell>
       <div className="page-header"><h1>Sign In</h1><p>Optional account access for saved calculations and your profile.</p></div>
       <section className="account-form-card">
+        {challenge ? (
+          <LoginTwoFactorStep
+            challenge={challenge}
+            working={working}
+            onVerify={verifyOtp}
+            onResend={resendOtp}
+            onBack={() => { setChallenge(null); setError(""); }}
+          />
+        ) : <>
         <div className="account-form-icon"><LogIn size={28}/></div>
         <h2>Welcome back</h2>
         <p className="account-form-intro">Guest calculations still work without signing in. Sign in when you want retained calculations linked to your account across browser sessions.</p>
@@ -108,7 +146,8 @@ export default function UserLoginPage() {
           <button className="btn btn-primary btn-lg account-form-submit" type="submit" disabled={working}>{working ? "Signing in…" : "Sign In"}</button>
           <div className="form-security-note">For this production frontend, the account session is kept only in the current browser tab and sent directly to Django with authenticated API requests.</div>
         </form>
-        <div className="account-form-footer">No account yet? <a href="/account/register">Create one</a> · <a href="/dashboard">Continue as guest</a></div>
+        <div className="account-form-footer"><a href="/account/forgot-password">Forgot password?</a> · No account yet? <a href="/account/register">Create one</a> · <a href="/dashboard">Continue as guest</a></div>
+        </>}
       </section>
     </AppShell>
   );

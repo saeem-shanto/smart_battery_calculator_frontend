@@ -10,12 +10,18 @@ import {
   saveAuthSession,
   userFetch,
 } from "./backend-client";
+import { isTwoFactorChallengePayload, toChallengeInfo, type TwoFactorChallengeInfo } from "./security-api";
 
 type AuthPayload = {
+  two_factor_required?: false;
   access: string;
   refresh: string;
   user: UserSummary;
 };
+
+export type LoginUserResult =
+  | { twoFactorRequired: false; user: UserSummary }
+  | { twoFactorRequired: true; challenge: TwoFactorChallengeInfo };
 
 function ensureAuthPayload(value: AuthPayload): AuthPayload {
   if (!value?.access || !value?.refresh || !value?.user) {
@@ -34,14 +40,18 @@ export async function getCurrentUser(): Promise<UserSummary | null> {
   return readJson<UserSummary>(response);
 }
 
-export async function loginUser(username: string, password: string) {
-  const payload = ensureAuthPayload(await readJson<AuthPayload>(await publicFetch("/accounts/auth/token/", {
+export async function loginUser(username: string, password: string): Promise<LoginUserResult> {
+  const payload = await readJson<AuthPayload | Record<string, unknown>>(await publicFetch("/accounts/auth/token/", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
-  })));
-  saveAuthSession("user", { access: payload.access, refresh: payload.refresh });
-  return { user: payload.user };
+  }));
+  if (isTwoFactorChallengePayload(payload)) {
+    return { twoFactorRequired: true, challenge: toChallengeInfo(payload) };
+  }
+  const authenticated = ensureAuthPayload(payload as AuthPayload);
+  saveAuthSession("user", { access: authenticated.access, refresh: authenticated.refresh });
+  return { twoFactorRequired: false, user: authenticated.user };
 }
 
 export async function registerUser(input: {

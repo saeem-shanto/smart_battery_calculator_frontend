@@ -3,9 +3,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Eye, EyeOff, LockKeyhole, ShieldCheck, UserRound } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
+import { LoginTwoFactorStep } from "@/components/LoginTwoFactorStep";
 import { loginAdmin } from "@/lib/admin-api";
 import { hasAuthSession } from "@/lib/backend-client";
 import { ApiRequestError, getApiFieldMessage } from "@/lib/api";
+import { resendTwoFactorCode, verifyLoginTwoFactor, type TwoFactorChallengeInfo } from "@/lib/security-api";
 
 type AdminField = "username" | "password";
 type AdminErrors = Partial<Record<AdminField, string>>;
@@ -28,6 +30,7 @@ export default function AdminLoginPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [working, setWorking] = useState(false);
+  const [challenge, setChallenge] = useState<TwoFactorChallengeInfo | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -65,7 +68,12 @@ export default function AdminLoginPage() {
     setFieldErrors({});
     setWorking(true);
     try {
-      await loginAdmin(cleanUsername, password);
+      const result = await loginAdmin(cleanUsername, password);
+      if (result.twoFactorRequired) {
+        setChallenge(result.challenge);
+        setPassword("");
+        return;
+      }
       window.location.replace("/admin");
     } catch (caught) {
       if (caught instanceof ApiRequestError) {
@@ -78,7 +86,8 @@ export default function AdminLoginPage() {
           setFieldErrors(cleaned);
           focusAdminField(cleaned.username ? "username" : "password");
         } else {
-          setError(caught.status === 401 ? "The admin username or password is incorrect." : caught.message);
+          const securityMessage = getApiFieldMessage(caught, "email") || getApiFieldMessage(caught, "non_field_errors");
+          setError(caught.status === 401 ? "The admin username or password is incorrect." : securityMessage || caught.message);
         }
       } else {
         setError(caught instanceof Error ? caught.message : "Admin login failed. Please try again.");
@@ -88,10 +97,37 @@ export default function AdminLoginPage() {
     }
   }
 
+  async function verifyOtp(code: string) {
+    if (!challenge) return;
+    setWorking(true);
+    try {
+      await verifyLoginTwoFactor("admin", challenge.challengeId, code);
+      window.location.replace("/admin");
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function resendOtp() {
+    if (!challenge) throw new Error("No active verification challenge.");
+    const next = await resendTwoFactorCode(challenge.challengeId);
+    setChallenge(next);
+    return next;
+  }
+
   return (
     <main className="admin-login-page">
       <section className="admin-login-card">
         <BrandLogo />
+        {challenge ? (
+          <LoginTwoFactorStep
+            challenge={challenge}
+            working={working}
+            onVerify={verifyOtp}
+            onResend={resendOtp}
+            onBack={() => { setChallenge(null); setError(""); }}
+          />
+        ) : <>
         <div className="admin-login-icon"><ShieldCheck size={30} /></div>
         <h1>Admin Login</h1>
         <p>Sign in with a Django staff account to manage calculation records and stored files.</p>
@@ -111,7 +147,9 @@ export default function AdminLoginPage() {
           <button className="btn btn-primary btn-lg admin-login-button" type="submit" disabled={working}>{working ? "Signing in…" : "Sign In"}</button>
         </form>
         <div className="admin-security-note"><LockKeyhole size={16}/><span>Credentials are verified directly by Django. The admin session is kept only in the current browser tab and sent to the backend in Authorization headers.</span></div>
+        <div className="account-form-footer"><a href="/account/forgot-password">Forgot password?</a></div>
         <a className="admin-back-link" href="/dashboard">← Back to user dashboard</a>
+        </>}
       </section>
     </main>
   );

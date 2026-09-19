@@ -5,6 +5,7 @@ import { Camera, Eye, EyeOff, KeyRound, Save, Trash2, UserRound } from "lucide-r
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ProtectedAvatar } from "@/components/ProtectedAvatar";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { TwoFactorSettings } from "@/components/TwoFactorSettings";
 import {
   changeAdminPassword,
   getAdminProfile,
@@ -223,6 +224,8 @@ export default function AdminProfilePage() {
           <div className="profile-form-actions"><span className="profile-save-state">{profileChanged ? "Unsaved changes" : "Profile is up to date"}</span><button className="btn btn-primary" disabled={working || !profileChanged}><Save size={17}/> {working ? "Saving…" : "Save Profile"}</button></div>
         </form>
       </section>
+      <TwoFactorSettings role="admin" user={user} onUserChanged={apply} />
+
       <section className="card page-card-space profile-card">
         <div className="card-header"><div><h2>Change Password</h2><p className="admin-card-subtitle">Changing your password revokes existing backend refresh tokens.</p></div><KeyRound size={22}/></div>
         <form className="account-form profile-form" onSubmit={change} noValidate>
