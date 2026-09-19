@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Eye, EyeOff, LockKeyhole, ShieldCheck, UserRound } from "lucide-react";
 import { BrandLogo } from "@/components/BrandLogo";
+import { loginAdmin } from "@/lib/admin-api";
+import { hasAuthSession } from "@/lib/backend-client";
 
 export default function AdminLoginPage() {
   const [username, setUsername] = useState("");
@@ -16,6 +18,7 @@ export default function AdminLoginPage() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("loggedOut") === "1") setNotice("You have been signed out.");
     if (params.get("passwordChanged") === "1") setNotice("Password changed successfully. Sign in again with the new password.");
+    if (hasAuthSession("admin")) window.location.replace("/admin");
   }, []);
 
   async function submit(event: FormEvent) {
@@ -29,13 +32,7 @@ export default function AdminLoginPage() {
 
     setWorking(true);
     try {
-      const response = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: cleanUsername, password }),
-      });
-      const payload = await response.json().catch(() => null) as { error?: string } | null;
-      if (!response.ok) throw new Error(payload?.error || "Admin login failed.");
+      await loginAdmin(cleanUsername, password);
       window.location.replace("/admin");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Admin login failed.");
@@ -64,7 +61,7 @@ export default function AdminLoginPage() {
           </div>
           <button className="btn btn-primary btn-lg admin-login-button" type="submit" disabled={working}>{working ? "Signing in..." : "Sign In"}</button>
         </form>
-        <div className="admin-security-note"><LockKeyhole size={16}/><span>Credentials are verified by the Django backend. Access and refresh tokens are kept in secure HttpOnly cookies by the Next.js server.</span></div>
+        <div className="admin-security-note"><LockKeyhole size={16}/><span>Credentials are verified directly by the Django backend. JWTs are kept for the current browser tab and sent only to Django in Authorization headers.</span></div>
         <a className="admin-back-link" href="/dashboard">← Back to user dashboard</a>
       </section>
     </main>

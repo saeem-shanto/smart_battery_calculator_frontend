@@ -5,10 +5,7 @@ import type {
   DraftCalculation,
   WorkbookValidationResponse,
 } from "./types";
-
-const PUBLIC_BACKEND = (process.env.NEXT_PUBLIC_BACKEND_API_URL || "").replace(/\/$/, "");
-const url = (backendPath: string, proxyPath: string) =>
-  PUBLIC_BACKEND ? `${PUBLIC_BACKEND}${backendPath}` : proxyPath;
+import { optionalUserFetch, publicFetch } from "./backend-client";
 
 type ErrorPayload = {
   error?: {
@@ -44,7 +41,7 @@ export function getApiFieldMessage(error: unknown, field: string): string | null
   return fieldText(error.fields[field]) || null;
 }
 
-async function readJson<T>(response: Response): Promise<T> {
+export async function readJson<T>(response: Response): Promise<T> {
   const payload = (await response.json().catch(() => null)) as ErrorPayload | T | null;
   if (!response.ok) {
     const error = payload && typeof payload === "object" && "error" in payload
@@ -60,36 +57,32 @@ async function readJson<T>(response: Response): Promise<T> {
     const message = [error?.message || `Request failed with HTTP ${response.status}.`, details].filter(Boolean).join(" ");
     throw new ApiRequestError(message, response.status, { code: error?.code, fields });
   }
+  if (response.status === 204) return undefined as T;
   if (payload === null) throw new Error("The server returned an empty response.");
   return payload as T;
 }
 
 export async function getHealth() {
   return readJson<{ status: string; calculation_engine: string }>(
-    await fetch(url("/api/v1/health/", "/api/system/health"), { cache: "no-store" }),
+    await publicFetch("/health/"),
   );
 }
 
 export async function getReadiness() {
   return readJson<{ status: string; engine: { ready: boolean; octave_version?: string | null } }>(
-    await fetch(url("/api/v1/ready/", "/api/system/ready"), { cache: "no-store" }),
+    await publicFetch("/ready/"),
   );
 }
 
 export async function getTariffs() {
-  return readJson<BackendTariff[]>(
-    await fetch(url("/api/v1/tariffs/", "/api/tariffs"), { cache: "no-store" }),
-  );
+  return readJson<BackendTariff[]>(await publicFetch("/tariffs/"));
 }
 
 export async function validateClientWorkbook(file: File) {
   const form = new FormData();
   form.append("file", file, file.name);
   return readJson<WorkbookValidationResponse>(
-    await fetch(url("/api/v1/profiles/client-workbook/validate/", "/api/profiles/client-workbook/validate"), {
-      method: "POST",
-      body: form,
-    }),
+    await publicFetch("/profiles/client-workbook/validate/", { method: "POST", body: form }),
   );
 }
 
@@ -102,14 +95,11 @@ export async function runWorkbookCalculation(draft: DraftCalculation, file: File
   if (draft.state) form.append("state", draft.state);
   form.append(
     "metadata",
-    JSON.stringify({ frontend: "nextjs", workflow: "client_workbook", retention_requested: Boolean(draft.retainData) }),
+    JSON.stringify({ frontend: "nextjs-direct-api", workflow: "client_workbook", retention_requested: Boolean(draft.retainData) }),
   );
   form.append("battery_installed_cost_per_kwh", String(draft.batteryInstalledCostPerKwh ?? 1000));
   return readJson<CalculationResponse>(
-    await fetch("/api/calculations/client-workbook", {
-      method: "POST",
-      body: form,
-    }),
+    await optionalUserFetch("/calculations/client-workbook/", { method: "POST", body: form }),
   );
 }
 
@@ -117,14 +107,14 @@ export async function getCalculation(publicId: string, token?: string | null) {
   const headers = new Headers();
   if (token) headers.set("X-Calculation-Token", token);
   return readJson<CalculationResponse>(
-    await fetch(`/api/calculations/${publicId}`, { headers, cache: "no-store" }),
+    await optionalUserFetch(`/calculations/${publicId}/`, { headers }),
   );
 }
 
 export async function deleteCalculation(publicId: string, token?: string | null) {
   const headers = new Headers();
   if (token) headers.set("X-Calculation-Token", token);
-  const response = await fetch(`/api/calculations/${publicId}`, { method: "DELETE", headers });
+  const response = await optionalUserFetch(`/calculations/${publicId}/`, { method: "DELETE", headers });
   if (!response.ok) await readJson(response);
 }
 
@@ -136,10 +126,7 @@ export async function downloadCalculationFile(
 ) {
   const headers = new Headers();
   if (token) headers.set("X-Calculation-Token", token);
-  const response = await fetch(
-    `/api/calculations/${publicId}/files/${fileId}/download`,
-    { headers },
-  );
+  const response = await optionalUserFetch(`/calculations/${publicId}/files/${fileId}/download/`, { headers });
   if (!response.ok) await readJson(response);
   const blob = await response.blob();
   const disposition = response.headers.get("content-disposition") || "";
@@ -155,7 +142,7 @@ export function downloadTransientCsv(base64Data: string, filename: string, conte
   downloadBlob(new Blob([bytes], { type: contentType }), filename);
 }
 
-function downloadBlob(blob: Blob, filename: string) {
+export function downloadBlob(blob: Blob, filename: string) {
   const objectUrl = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = objectUrl;

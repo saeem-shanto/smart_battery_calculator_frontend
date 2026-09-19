@@ -29,7 +29,7 @@ export default function UserLoginPage() {
       await loginUser(username.trim(), password);
       window.dispatchEvent(new Event("smart-battery:user-changed"));
       const next = new URLSearchParams(window.location.search).get("next");
-      window.location.replace(next && next.startsWith("/") ? next : "/dashboard");
+      window.location.replace(next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Sign in failed.");
     } finally {

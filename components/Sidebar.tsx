@@ -1,10 +1,12 @@
 "use client";
+import type { MouseEvent } from "react";
 import { usePathname } from "next/navigation";
 import { CircleHelp, CirclePlus, Clock3, Home, Info, LibraryBig, Leaf, ShieldCheck } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
 import { UserAccountWidget } from "./UserAccountWidget";
 import { clearDraft } from "@/lib/draft";
 import { clearDraftFile } from "@/lib/file-store";
+import { clearCachedTransientResult } from "@/lib/transient-result-cache";
 
 const items = [
   { label: "Home", href: "/dashboard", icon: Home },
@@ -18,5 +20,15 @@ const items = [
 export function Sidebar() {
   const pathname=usePathname();
   const active=(href:string)=>href==="/calculator/load-solar"?pathname.startsWith("/calculator/"):pathname===href;
-  return <aside className="sidebar"><BrandLogo/><div className="sidebar-divider"/><nav className="sidebar-nav" aria-label="Main navigation">{items.map(({label,href,icon:Icon})=><a href={href} className={`nav-item ${active(href)?"active":""}`} key={label} onClick={()=>{if(href==="/calculator/load-solar"){clearDraft();void clearDraftFile();}}}><Icon size={21} strokeWidth={1.8}/><span>{label}</span></a>)}</nav><UserAccountWidget/><div className="sidebar-tip"><Leaf size={20}/><span>Research decision-support tool using the client’s validated battery optimisation model.</span></div></aside>;
+
+  async function navigate(event: MouseEvent<HTMLAnchorElement>, href: string) {
+    if (href !== "/calculator/load-solar") return;
+    event.preventDefault();
+    clearDraft();
+    clearCachedTransientResult();
+    await clearDraftFile().catch(() => undefined);
+    window.location.assign(href);
+  }
+
+  return <aside className="sidebar"><BrandLogo/><div className="sidebar-divider"/><nav className="sidebar-nav" aria-label="Main navigation">{items.map(({label,href,icon:Icon})=><a href={href} className={`nav-item ${active(href)?"active":""}`} key={label} onClick={(event)=>void navigate(event,href)}><Icon size={21} strokeWidth={1.8}/><span>{label}</span></a>)}</nav><UserAccountWidget/><div className="sidebar-tip"><Leaf size={20}/><span>Research decision-support tool using the client’s validated battery optimisation model.</span></div></aside>;
 }

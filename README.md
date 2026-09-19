@@ -1,79 +1,100 @@
-# Smart Battery Calculator Frontend — v1.5.3 Final
+# Smart Battery Calculator Frontend — v1.5.5 Production
 
-Professional Next.js frontend for Project N01, integrated with the refined Django + GNU Octave backend v1.5.2.
+Production Next.js frontend for Project N01. The visual theme, layout and existing icon language are preserved from the approved prototype.
 
-## Current capabilities
+## Architecture
 
-- Four-step annual workbook calculation workflow with the existing project theme/layout
-- XLS/XLSX/CSV/TXT pre-validation before calculation
-- Field-level validation, red error states, focus and scroll-to-error behaviour
-- Explicit privacy choice: transient processing or retained calculation
-- Transient canonical CSV download without backend retention
-- Retained calculation input/result downloads
-- Optional user registration, sign-in, sign-out and automatic JWT refresh
-- User JWTs stored only in secure HttpOnly Next.js cookies
-- Profile name/email/username and private JPEG/PNG/WebP avatar management
-- Account-owned retained calculations available across browser sessions
-- Browser-local guest calculation history using the backend private guest token
-- One-click claim of an eligible guest calculation into the signed-in account
-- Secure owner-vs-guest calculation retrieval/download/delete routing
-- Existing Django staff/admin portal remains separate
-- Backend health/readiness indicator
-- Development-only debug overlay controlled by environment variable
-- Browser title/favicon using the Smart Battery Calculator battery/energy mark
+Next.js is the frontend only. Browser requests go directly to the public Django REST API:
 
-There is no dummy calculation fallback.
+```text
+Browser / Next.js UI
+        ↓ HTTPS REST
+Django backend /api/v1
+        ↓
+PostgreSQL + Supabase Storage + GNU Octave
+```
+
+There is no `app/api/*` application proxy layer in this build.
+
+## Production features
+
+- Guest workbook validation and calculation
+- Optional backend retention (`retain_data=true/false`)
+- Optional user registration/login/profile/avatar
+- Account-owned retained calculations
+- Guest-token retained calculations and account claiming
+- User/admin JWT refresh and logout
+- Admin calculation/file management
+- Protected avatar/file downloads through authenticated browser `fetch`
+- Transient-result browser-session cache to prevent accidental Octave reruns on refresh
+- Debug overlay for development only
+- Smart Battery Calculator browser title icon
+
+## Authentication
+
+Django issues SimpleJWT access/refresh tokens. Because this frontend calls Django directly, the tokens are stored in **`sessionStorage` for the current browser tab** and sent only in `Authorization: Bearer ...` headers. They are not placed in URLs or long-lived `localStorage`.
+
+Guest calculation capability tokens remain browser-local and are sent through `X-Calculation-Token` only for ownerless retained guest calculations.
 
 ## Local development
 
-1. Start Django at `http://127.0.0.1:8000`.
-2. Copy `.env.local.example` to `.env.local`.
-3. Install/run:
+Create `.env.local`:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000/api/v1
+NEXT_PUBLIC_MAX_UPLOAD_MB=15
+NEXT_PUBLIC_APP_DEBUG=true
+APP_DEBUG_BUILD=true
+NEXT_PUBLIC_APP_VERSION=1.5.5
+```
+
+Then:
 
 ```bash
-npm ci
+npm install
 npm run typecheck
 npm run dev:local
 ```
 
-Open `http://localhost:3000`.
-
-Recommended local environment:
+Django must allow the frontend origin, normally:
 
 ```env
-BACKEND_API_URL=http://127.0.0.1:8000
-NEXT_PUBLIC_APP_DEBUG=true
-NEXT_PUBLIC_APP_VERSION=1.5.3
+CORS_ALLOWED_ORIGINS=http://localhost:3000
+CSRF_TRUSTED_ORIGINS=http://localhost:3000
 ```
 
-Keep `NEXT_PUBLIC_BACKEND_API_URL` unset unless you deliberately want public browser-to-Django calls. Account and protected calculation requests always use same-origin Next.js BFF routes so JWTs remain HttpOnly.
+## Production deployment
 
-## Production
-
-Set the server-side `BACKEND_API_URL` to the deployed Django URL and disable the debug overlay:
+Set these variables in Vercel (or the chosen frontend host) **before the build**:
 
 ```env
-BACKEND_API_URL=https://your-django-backend.example
+NEXT_PUBLIC_API_BASE_URL=https://smart-battery-calculator-backend-2.onrender.com/api/v1
+NEXT_PUBLIC_MAX_UPLOAD_MB=15
 NEXT_PUBLIC_APP_DEBUG=false
-NEXT_PUBLIC_APP_VERSION=1.5.3
+APP_DEBUG_BUILD=false
+NEXT_PUBLIC_APP_VERSION=1.5.5
 ```
 
-Then run:
+On the Django/Render service, allow the exact deployed frontend origin:
+
+```env
+CORS_ALLOWED_ORIGINS=https://YOUR-FRONTEND-DOMAIN
+CSRF_TRUSTED_ORIGINS=https://YOUR-FRONTEND-DOMAIN
+```
+
+If you use both a Vercel domain and a custom domain, include both as comma-separated origins.
+
+Because uploads now go directly from the browser to Django, they do not pass through a Vercel Function payload limit.
+
+## Release verification
+
+Before deployment:
 
 ```bash
-npm ci
+rm -rf node_modules .next
+npm install
 npm run typecheck
 npm run build
-npm start
 ```
 
-## Retention/account behaviour
-
-- `retain_data=false`: the backend processes transiently, creates no retained calculation/file rows, and returns the canonical CSV inline.
-- `retain_data=true` + guest: the backend returns a private calculation token. The browser stores that token locally for later guest access.
-- `retain_data=true` + signed-in user: the calculation is owned by the account. The frontend does not need or store a guest calculation token.
-- A signed-in user can claim an eligible retained guest calculation using its existing guest token. After claim, account JWT access supersedes the guest token.
-
-## Debug mode
-
-`NEXT_PUBLIC_APP_DEBUG=true` enables a compact bottom-right diagnostics panel showing only non-secret frontend/runtime information: route, app version, backend health/readiness, account state and engine readiness. Never place secrets in `NEXT_PUBLIC_*` variables.
+The package intentionally does not include a stale `package-lock.json`; run `npm install` once in your normal internet-connected development environment and commit the newly generated lockfile before your final repository release.

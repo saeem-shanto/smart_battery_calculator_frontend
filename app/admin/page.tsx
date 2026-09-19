@@ -1,4 +1,18 @@
-import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+"use client";
+
+import { useEffect, useState } from "react";
 import AdminDashboardClient from "./AdminDashboardClient";
-export default async function AdminPage(){const store=await cookies();if(!store.get("smart_battery_admin_access")?.value&&!store.get("smart_battery_admin_refresh")?.value)redirect("/admin/login");return <AdminDashboardClient/>;}
+import { hasAuthSession } from "@/lib/backend-client";
+
+export default function AdminPage() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (!hasAuthSession("admin")) {
+      window.location.replace("/admin/login");
+      return;
+    }
+    setReady(true);
+  }, []);
+  if (!ready) return <main className="admin-login-page"><div className="loading-inline"><span className="spinner-dark"/> Checking administrator session…</div></main>;
+  return <AdminDashboardClient/>;
+}

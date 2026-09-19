@@ -8,7 +8,8 @@ import { clearDraftFile } from "@/lib/file-store";
 import { deleteCalculation } from "@/lib/api";
 import { claimCalculation, getCurrentUser, getOwnedCalculations } from "@/lib/account-api";
 import { listCalculationHistory, removeHistoryItem } from "@/lib/calculation-history";
-import type { LocalCalculation, OwnedCalculation, UserSummary } from "@/lib/types";
+import { isCompleteBatteryResult, type LocalCalculation, type OwnedCalculation, type UserSummary } from "@/lib/types";
+import { clearCachedTransientResult } from "@/lib/transient-result-cache";
 
 type HistoryRow = {
   publicId: string;
@@ -17,8 +18,8 @@ type HistoryRow = {
   suburb: string;
   state: string;
   createdAt: string;
-  batterySizeKwh: number;
-  annualSavingsAud: number;
+  batterySizeKwh: number | null;
+  annualSavingsAud: number | null;
   status: string;
   source: "account" | "guest";
   guestToken?: string;
@@ -32,8 +33,8 @@ function accountRow(item: OwnedCalculation): HistoryRow {
     suburb: item.suburb || "",
     state: item.state || "",
     createdAt: item.created_at,
-    batterySizeKwh: Number(item.result?.optimal_battery_size_kwh || 0),
-    annualSavingsAud: Number(item.result?.estimated_annual_bill_reduction_aud || 0),
+    batterySizeKwh: isCompleteBatteryResult(item.result) ? item.result.optimal_battery_size_kwh : null,
+    annualSavingsAud: isCompleteBatteryResult(item.result) ? item.result.estimated_annual_bill_reduction_aud : null,
     status: item.status,
     source: "account",
   };
@@ -70,9 +71,10 @@ export default function ResultsHistoryPage() {
       const current = await getCurrentUser();
       setUser(current);
       setOwned(current ? await getOwnedCalculations() : []);
-    } catch {
+    } catch (caught) {
       setUser(null);
       setOwned([]);
+      setError(caught instanceof Error ? `Account calculations could not be loaded: ${caught.message}` : "Account calculations could not be loaded. Guest records from this browser are still shown.");
     } finally {
       setLoading(false);
     }
@@ -113,7 +115,10 @@ export default function ResultsHistoryPage() {
   }
 
   async function startNew() {
-    clearDraft(); await clearDraftFile(); window.location.assign("/calculator/load-solar");
+    clearDraft();
+    clearCachedTransientResult();
+    await clearDraftFile().catch(() => undefined);
+    window.location.assign("/calculator/load-solar");
   }
 
   return (
@@ -137,8 +142,8 @@ export default function ResultsHistoryPage() {
               <td><strong>{item.inputFilename}</strong></td>
               <td>{[item.suburb,item.state,item.postcode].filter(Boolean).join(", ") || "—"}</td>
               <td>{new Date(item.createdAt).toLocaleString()}</td>
-              <td>{item.batterySizeKwh.toFixed(2)} kWh</td>
-              <td>${item.annualSavingsAud.toFixed(2)}</td>
+              <td>{item.batterySizeKwh === null ? "—" : `${item.batterySizeKwh.toFixed(2)} kWh`}</td>
+              <td>{item.annualSavingsAud === null ? "—" : `$${item.annualSavingsAud.toFixed(2)}`}</td>
               <td><span className={`access-pill ${item.source}`}>{item.source === "account" ? "Account" : "This browser"}</span></td>
               <td><span className="status-pill">{item.status}</span></td>
               <td><div className="action-buttons">

@@ -14,8 +14,10 @@ import { getDraft, saveDraft } from "@/lib/draft";
 import { clearDraftFile, getDraftFile, saveDraftFile } from "@/lib/file-store";
 import { getApiFieldMessage, validateClientWorkbook } from "@/lib/api";
 import type { WorkbookValidationResponse } from "@/lib/types";
+import { clearCachedTransientResult } from "@/lib/transient-result-cache";
 
-const MAX_MB = 15;
+const configuredMaxMb = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB || 15);
+const MAX_MB = Number.isFinite(configuredMaxMb) && configuredMaxMb > 0 ? configuredMaxMb : 15;
 type FieldErrors = { file?: string; postcode?: string };
 
 export default function LoadSolarPage() {
@@ -60,6 +62,7 @@ export default function LoadSolarPage() {
 
   async function validateAndStore(file: File): Promise<boolean> {
     setSaving(true);
+    clearCachedTransientResult();
     setErrors((current) => ({ ...current, file: undefined }));
     setValidation(null);
 
@@ -114,10 +117,19 @@ export default function LoadSolarPage() {
     }
 
     if (message) {
+      clearCachedTransientResult();
+      await clearDraftFile().catch(() => undefined);
       setFileName(file.name);
       setFileSize(file.size);
       setValidation(null);
       setErrors((current) => ({ ...current, file: message }));
+      saveDraft({
+        inputFileName: undefined,
+        inputFileSize: undefined,
+        workbookValidation: undefined,
+        publicId: undefined,
+        accessToken: undefined,
+      });
       reveal(uploadRef.current);
       return;
     }
@@ -188,7 +200,7 @@ export default function LoadSolarPage() {
               <span>
                 {fileName
                   ? `${(fileSize / 1024).toFixed(1)} KB · ${saving ? "validating with backend…" : validation ? "validated and ready" : "awaiting validation"}`
-                  : "Accepted: .xls, .xlsx, .csv, .txt · up to 15 MB"}
+                  : `Accepted: .xls, .xlsx, .csv, .txt · up to ${MAX_MB} MB`}
               </span>
             </div>
             <span className="btn btn-outline-green">{saving ? "Validating…" : "Select File"}</span>
@@ -268,7 +280,7 @@ export default function LoadSolarPage() {
             <input type="checkbox" checked={retainData} onChange={(event) => setRetainData(event.target.checked)} />
             <span>
               <strong>Save my uploaded file and calculation for later access.</strong>
-              <small>If enabled, the backend retains the input, calculation record and canonical result CSV. If disabled, processing is transient and no calculation/file record is stored server-side.</small>
+              <small>If enabled, the backend retains the input, calculation record and canonical result CSV. If disabled, processing is transient and no calculation/file record is stored server-side. The selected workbook is kept temporarily in this browser while you move between steps or retry.</small>
             </span>
           </label>
         </section>

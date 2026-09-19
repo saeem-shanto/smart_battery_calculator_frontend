@@ -3,19 +3,26 @@
 import { useEffect, useState } from "react";
 import { LogIn, LogOut, UserRound } from "lucide-react";
 import { getCurrentUser, logoutUser } from "@/lib/account-api";
+import { ProtectedAvatar } from "./ProtectedAvatar";
+import { hasAuthSession } from "@/lib/backend-client";
 import type { UserSummary } from "@/lib/types";
 
 export function UserAccountWidget() {
   const [user, setUser] = useState<UserSummary | null | undefined>(undefined);
+  const [accountUnavailable, setAccountUnavailable] = useState(false);
   const [avatarVersion, setAvatarVersion] = useState(0);
 
   useEffect(() => {
-    getCurrentUser().then(setUser).catch(() => setUser(null));
+    getCurrentUser().then((next) => { setUser(next); setAccountUnavailable(false); }).catch(() => {
+      setAccountUnavailable(hasAuthSession("user"));
+      setUser(null);
+    });
     const refresh = () => {
       getCurrentUser().then((next) => {
         setUser(next);
+        setAccountUnavailable(false);
         setAvatarVersion((value) => value + 1);
-      }).catch(() => setUser(null));
+      }).catch(() => { setAccountUnavailable(hasAuthSession("user")); setUser(null); });
     };
     window.addEventListener("smart-battery:user-changed", refresh);
     return () => window.removeEventListener("smart-battery:user-changed", refresh);
@@ -32,6 +39,15 @@ export function UserAccountWidget() {
     return <div className="account-widget account-widget-loading" aria-label="Checking account"><span className="account-avatar-placeholder"><UserRound size={17}/></span><span>Checking account…</span></div>;
   }
 
+  if (!user && accountUnavailable) {
+    return (
+      <div className="account-widget guest-account-widget" title="The backend account service is temporarily unavailable.">
+        <div className="account-avatar-placeholder"><UserRound size={17}/></div>
+        <div className="account-widget-copy"><strong>Account unavailable</strong><span>Your browser session is preserved.</span></div>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="account-widget guest-account-widget">
@@ -45,10 +61,13 @@ export function UserAccountWidget() {
   return (
     <div className="account-widget">
       <a className="account-avatar" href="/account/profile" aria-label="Open profile">
-        {user.avatar_download_path
-          ? <img src={`/api/account/me/avatar?v=${avatarVersion}`} alt="" />
-          : <UserRound size={18}/>
-        }
+        <ProtectedAvatar
+          role="user"
+          enabled={Boolean(user.avatar_download_path)}
+          version={avatarVersion}
+          alt=""
+          fallback={<UserRound size={18}/>}
+        />
       </a>
       <a className="account-widget-copy" href="/account/profile">
         <strong>{user.name}</strong>

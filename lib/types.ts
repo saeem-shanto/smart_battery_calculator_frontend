@@ -83,7 +83,7 @@ export type CalculationResponse = {
   state: string;
   metadata: Record<string, unknown>;
   input_filename: string | null;
-  result: BatteryCalculationResult;
+  result: BatteryCalculationResult | Partial<BatteryCalculationResult>;
   assumptions: string[];
   warnings: string[];
   algorithm_version: string;
@@ -198,10 +198,36 @@ export type OwnedCalculation = {
   state: string;
   metadata: Record<string, unknown>;
   input_filename: string | null;
-  result: BatteryCalculationResult;
+  result: BatteryCalculationResult | Partial<BatteryCalculationResult>;
   algorithm_version: string;
   runtime_ms: number;
   files: CalculationFile[];
   created_at: string;
   updated_at: string;
 };
+
+export function isCompleteBatteryResult(value: unknown): value is BatteryCalculationResult {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Record<string, unknown>;
+  const finite = (key: string) => { const candidate = result[key]; return typeof candidate === "number" && Number.isFinite(candidate); };
+  const text = (key: string) => typeof result[key] === "string" && Boolean(result[key]);
+  const numericFields = [
+    "optimal_battery_size_kwh",
+    "net_annual_payment_aud",
+    "baseline_annual_payment_aud",
+    "estimated_annual_bill_reduction_aud",
+    "estimated_annual_bill_reduction_percent",
+    "export_to_grid_kwh_year",
+    "import_from_grid_kwh_year",
+    "annual_load_kwh",
+    "annual_pv_generation_kwh",
+    "self_consumption_percent",
+    "baseline_self_consumption_percent",
+    "battery_upfront_cost_aud",
+    "pv_size_kw",
+    "profile_duration_hours",
+  ];
+  if (!numericFields.every(finite)) return false;
+  if (!(result.simple_payback_years === null || finite("simple_payback_years"))) return false;
+  return text("engine") && text("algorithm_source") && text("algorithm_sha256");
+}

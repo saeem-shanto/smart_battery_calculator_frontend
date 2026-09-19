@@ -1,40 +1,46 @@
-# Frontend ↔ Backend v1.5.2 mapping
+# Frontend ↔ Backend Integration — v1.5.5
 
-| UI action | Django API |
-|---|---|
-| Backend status | `GET /api/v1/health/` |
-| Backend readiness | `GET /api/v1/ready/` |
-| Tariff reference list | `GET /api/v1/tariffs/` |
-| Validate workbook without retention | `POST /api/v1/profiles/client-workbook/validate/` |
-| Run workbook calculation | `POST /api/v1/calculations/client-workbook/` with explicit `retain_data` and optional account Bearer JWT |
-| Register account | `POST /api/v1/accounts/register/` |
-| User login | `POST /api/v1/accounts/auth/token/` |
-| Refresh user session | `POST /api/v1/accounts/auth/token/refresh/` |
-| Logout | `POST /api/v1/accounts/auth/logout/` |
-| Get/update profile | `GET/PATCH /api/v1/accounts/me/` |
-| Private avatar | `GET /api/v1/accounts/me/avatar/` |
-| Change password | `POST /api/v1/accounts/me/password/` |
-| Account calculations | `GET /api/v1/accounts/me/calculations/` |
-| Claim guest calculation | `POST /api/v1/calculations/{public_id}/claim/` + account JWT + guest token |
-| Reopen account-owned result | `GET /api/v1/calculations/{public_id}/` + account JWT |
-| Reopen guest retained result | Same endpoint + `X-Calculation-Token` |
-| Delete retained record | Same access model using `DELETE` |
-| Download retained input/CSV | `/api/v1/calculations/{public_id}/files/{file_id}/download/` using owner JWT or guest token |
-| Download transient CSV | Inline `transient_csv.base64_data` |
-| Admin login | `POST /api/v1/admin/auth/token/` |
-| Admin summary/table/detail | `/api/v1/admin/...` |
+## Direct API contract
 
-## Security model
+The frontend uses `NEXT_PUBLIC_API_BASE_URL` as the canonical Django API prefix. Example:
 
-User/admin JWTs are never exposed to browser JavaScript. The Next.js API layer stores access/refresh tokens in HttpOnly, SameSite=Lax cookies and performs refresh/retry server-side. Guest calculation tokens remain browser-local because they are the backend capability credential for ownerless retained guest records.
+```text
+https://smart-battery-calculator-backend-2.onrender.com/api/v1
+```
 
-## Immutable algorithm values shown in Step 2
+All browser requests are created by `lib/backend-client.ts`.
 
-- PV size: 5.0 kW
-- Retail price: AUD 0.3773/kWh
-- Feed-in tariff: AUD 0.124/kWh
-- Battery annual payment rate: AUD 50/kWh/year
-- Search range: 0–50 kWh
-- SOC range: 10%–95%
+### Public API
 
-The frontend does not send fake overrides for these constants.
+- `GET /health/`
+- `GET /ready/`
+- `GET /tariffs/`
+- `POST /profiles/client-workbook/validate/`
+- `POST /calculations/client-workbook/` (guest or optional authenticated owner)
+
+### User account API
+
+- `POST /accounts/register/`
+- `POST /accounts/auth/token/`
+- `POST /accounts/auth/token/refresh/`
+- `POST /accounts/auth/logout/`
+- `GET/PATCH /accounts/me/`
+- `GET /accounts/me/avatar/`
+- `POST /accounts/me/password/`
+- `GET /accounts/me/calculations/`
+
+### Calculation ownership/access
+
+- Account owner: Bearer JWT
+- Guest retained record: `X-Calculation-Token`
+- Claim guest record: Bearer JWT + `X-Calculation-Token`
+
+### Admin API
+
+Admin authentication uses `/admin/auth/token/` and `/admin/auth/token/refresh/`. Staff profile operations reuse `/accounts/me/*` with the admin JWT. Dashboard operations use `/admin/*`.
+
+## CORS requirement
+
+Direct browser calls require Django to allow the deployed frontend origin. `Authorization` is part of django-cors-headers' default headers, and the backend already adds `x-calculation-token`.
+
+No cross-site cookies are used by the application API, so `CORS_ALLOW_CREDENTIALS=False` remains appropriate.

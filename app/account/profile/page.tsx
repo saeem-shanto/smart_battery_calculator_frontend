@@ -3,6 +3,7 @@
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { Camera, CheckCircle2, KeyRound, LogOut, Save, Trash2, UserRound } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { ProtectedAvatar } from "@/components/ProtectedAvatar";
 import {
   changePassword,
   getCurrentUser,
@@ -116,7 +117,7 @@ export default function ProfilePage() {
       <section className="card page-card-space profile-card">
         <div className="profile-avatar-panel">
           <div className="profile-avatar-large">
-            {user.avatar_download_path ? <img src={`/api/account/me/avatar?v=${avatarVersion}`} alt="Profile"/> : <UserRound size={42}/>} 
+            {<ProtectedAvatar role="user" enabled={Boolean(user.avatar_download_path)} version={avatarVersion} alt="Profile" fallback={<UserRound size={42}/>} />} 
           </div>
           <div><h2>{user.name}</h2><p>@{user.username}{user.is_staff ? " · Staff account" : ""}</p></div>
           <div className="profile-avatar-actions">

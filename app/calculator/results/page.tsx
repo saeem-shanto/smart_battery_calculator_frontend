@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -23,9 +23,11 @@ import {
   downloadTransientCsv,
   getCalculation,
   runWorkbookCalculation,
+  ApiRequestError,
 } from "@/lib/api";
-import { getHistoryItem, saveCalculationHistory } from "@/lib/calculation-history";
-import type { CalculationResponse } from "@/lib/types";
+import { getHistoryItem, removeHistoryItem, saveCalculationHistory } from "@/lib/calculation-history";
+import { isCompleteBatteryResult, type CalculationResponse } from "@/lib/types";
+import { clearCachedTransientResult, getCachedTransientResult, hasTransientAttempt, markTransientAttempt, saveCachedTransientResult, transientFingerprint } from "@/lib/transient-result-cache";
 
 export default function ResultsPage() {
   const [data, setData] = useState<CalculationResponse | null>(null);
@@ -33,18 +35,45 @@ export default function ResultsPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState("");
+  const [downloadError, setDownloadError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const startedAttempt = useRef<number | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
+    if (!loading) return;
+    setElapsedSeconds(0);
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [loading, attempt]);
+
+  useEffect(() => {
+    if (!loading) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [loading]);
+
+  useEffect(() => {
+    // React Strict Mode intentionally re-runs effects in development. Without
+    // this guard the annual Octave optimisation can be submitted twice.
+    if (startedAttempt.current === attempt) return;
+    startedAttempt.current = attempt;
 
     (async () => {
       try {
+        setError("");
         const params = new URLSearchParams(window.location.search);
         const requested = params.get("id");
         if (requested) {
           const item = getHistoryItem(requested);
           const response = await getCalculation(requested, item?.accessToken);
-          if (cancelled) return;
           setData(response);
           setToken(item?.accessToken || "");
           return;
@@ -53,42 +82,67 @@ export default function ResultsPage() {
         const draft = getDraft();
         if (draft.publicId) {
           const response = await getCalculation(draft.publicId, draft.accessToken);
-          if (cancelled) return;
           setData(response);
           setToken(draft.accessToken || "");
           if (draft.accessToken) saveCalculationHistory(response, draft.accessToken);
           return;
         }
 
+        const fingerprint = transientFingerprint(draft);
+        if (!draft.retainData) {
+          const cached = getCachedTransientResult(fingerprint);
+          if (cached) {
+            setData(cached);
+            setToken("");
+            return;
+          }
+          if (hasTransientAttempt(fingerprint)) {
+            throw new Error("The previous private result is no longer available in this browser. Use Retry Calculation to run the optimisation again.");
+          }
+          markTransientAttempt(fingerprint);
+        }
+
         const file = await getDraftFile();
         if (!file) throw new Error("The uploaded input file is no longer available. Return to Step 1 and select it again.");
 
         const response = await runWorkbookCalculation(draft, file);
-        if (cancelled) return;
         setData(response);
 
         if (response.retained) {
           const publicId = response.public_id;
-          const access = response.access_token;
-          if (!publicId || !access) throw new Error("The backend retained the calculation but did not return its private access credentials.");
+          if (!publicId) throw new Error("The backend retained the calculation but did not return its calculation ID.");
+
+          // Guest retained calculations receive a private access token.
+          // Account-owned retained calculations intentionally do not: future
+          // access is authorized by the signed-in user's Django JWT session.
+          const access = response.access_token || "";
           setToken(access);
-          saveDraft({ publicId, accessToken: access });
-          saveCalculationHistory(response, access);
+          saveDraft({ publicId, accessToken: access || undefined });
+          if (access) saveCalculationHistory(response, access);
+          else removeHistoryItem(publicId);
         } else {
           setToken("");
           saveDraft({ publicId: undefined, accessToken: undefined });
+          saveCachedTransientResult(fingerprint, response);
         }
       } catch (caught) {
-        if (!cancelled) setError(caught instanceof Error ? caught.message : "The calculation could not be completed.");
+        setError(calculationErrorMessage(caught));
       } finally {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       }
     })();
+  }, [attempt]);
 
-    return () => { cancelled = true; };
-  }, []);
+  function retryCalculation() {
+    clearCachedTransientResult();
+    setData(null);
+    setToken("");
+    setError("");
+    setLoading(true);
+    setAttempt((value) => value + 1);
+  }
 
-  const result = data?.result;
+  const result = data?.status === "completed" && isCompleteBatteryResult(data.result) ? data.result : null;
   const location = useMemo(
     () => [data?.suburb, data?.state, data?.postcode].filter(Boolean).join(", "),
     [data],
@@ -97,10 +151,11 @@ export default function ResultsPage() {
   async function downloadStored(fileId: string, name: string) {
     if (!data?.public_id) return;
     setDownloading(fileId);
+    setDownloadError("");
     try {
       await downloadCalculationFile(data.public_id, fileId, token, name);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Download failed.");
+      setDownloadError(caught instanceof Error ? caught.message : "Download failed.");
     } finally {
       setDownloading("");
     }
@@ -115,13 +170,14 @@ export default function ResultsPage() {
         data.transient_csv.content_type,
       );
     } catch {
-      setError("The transient CSV could not be prepared for download.");
+      setDownloadError("The transient CSV could not be prepared for download.");
     }
   }
 
   async function startNew() {
     clearDraft();
-    await clearDraftFile();
+    clearCachedTransientResult();
+    await clearDraftFile().catch(() => undefined);
     window.location.assign("/calculator/load-solar");
   }
 
@@ -133,7 +189,17 @@ export default function ResultsPage() {
         <div className="calculation-loading">
           <span className="spinner-dark" />
           <h2>Running the battery optimisation…</h2>
-          <p>The backend is processing the annual profile with GNU Octave. Please keep this page open.</p>
+          <p>The backend is processing the annual profile with GNU Octave. Please keep this page open and avoid refreshing.</p>
+          <div className="calculation-progress-copy">
+            <strong>{elapsedSeconds < 60 ? `${elapsedSeconds}s elapsed` : `${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s elapsed`}</strong>
+            <span>
+              {elapsedSeconds < 45
+                ? "Preparing and optimising the full-year profile…"
+                : elapsedSeconds < 120
+                  ? "The optimisation is still running. Render cold starts and annual profiles can take longer."
+                  : "This is taking longer than usual, but the request is still active. The page will update when the backend responds."}
+            </span>
+          </div>
         </div>
       </AppShell>
     );
@@ -148,9 +214,36 @@ export default function ResultsPage() {
         <div className="error-box" role="alert">
           <strong>Calculation error</strong>
           <span>{error}</span>
-          <button className="btn btn-small" onClick={() => window.location.assign("/calculator/load-solar")}>
-            <RefreshCcw size={16} /> Return to Step 1
-          </button>
+          <div className="calculation-error-actions">
+            <button className="btn btn-small btn-primary" onClick={retryCalculation}>
+              <RefreshCcw size={16} /> Retry Calculation
+            </button>
+            <button className="btn btn-small" onClick={() => window.location.assign("/calculator/battery-costs")}>
+              <ArrowLeft size={16} /> Back to Battery Cost
+            </button>
+            <button className="btn btn-small" onClick={() => window.location.assign("/calculator/load-solar")}>
+              Return to Step 1
+            </button>
+          </div>
+        </div>
+      )}
+
+
+      {downloadError && (
+        <div className="error-box" role="alert">
+          <strong>Download error</strong>
+          <span>{downloadError}</span>
+        </div>
+      )}
+
+      {data && !result && !error && (
+        <div className="error-box calculation-record-status" role="status">
+          <strong>This calculation did not complete successfully</strong>
+          <span>Backend status: {data.status}. The saved record may still contain the original input file, but there is no complete result payload to display.</span>
+          <div className="calculation-error-actions">
+            <button className="btn btn-small btn-primary" onClick={startNew}>New Calculation</button>
+            <button className="btn btn-small" onClick={() => window.location.assign("/results-history")}><ArrowLeft size={16}/> My Calculations</button>
+          </div>
         </div>
       )}
 
@@ -276,6 +369,20 @@ export default function ResultsPage() {
       )}
     </AppShell>
   );
+}
+
+function calculationErrorMessage(error: unknown) {
+  if (error instanceof ApiRequestError) {
+    if (error.status === 502) {
+      return `${error.message} The workbook passed validation, so the failure occurred while the calculation engine was running. Your inputs are still available and you can retry without uploading again.`;
+    }
+    if (error.status === 503 || error.status === 504) {
+      return `${error.message} Your inputs are still available; wait for the backend to recover and retry.`;
+    }
+    if (error.status === 401) return "Your account session expired. Sign in again, then retry the calculation.";
+    if (error.status === 403) return "This saved calculation is not accessible with the current account or guest token.";
+  }
+  return error instanceof Error ? error.message : "The calculation could not be completed.";
 }
 
 function Metric({ icon, tone, label, value, badge }: { icon: React.ReactNode; tone: "green" | "purple" | "gold"; label: string; value: string; badge?: string }) {

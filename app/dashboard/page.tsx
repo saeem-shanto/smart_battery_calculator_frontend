@@ -3,18 +3,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, BatteryCharging, Calculator, CircleDollarSign } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { clearDraft } from "@/lib/draft";
+import { clearDraftFile } from "@/lib/file-store";
 import { SolarIllustration } from "@/components/SolarIllustration";
 import { listCalculationHistory } from "@/lib/calculation-history";
 import { getHealth } from "@/lib/api";
 import { getCurrentUser, getOwnedCalculations } from "@/lib/account-api";
-import type { LocalCalculation, OwnedCalculation, UserSummary } from "@/lib/types";
+import { isCompleteBatteryResult, type LocalCalculation, type OwnedCalculation, type UserSummary } from "@/lib/types";
+import { clearCachedTransientResult } from "@/lib/transient-result-cache";
 
 type RecentRow = {
   publicId: string;
   inputFilename: string;
   createdAt: string;
-  batterySizeKwh: number;
-  annualSavingsAud: number;
+  batterySizeKwh: number | null;
+  annualSavingsAud: number | null;
   status: string;
   source: "account" | "guest";
 };
@@ -24,8 +27,8 @@ function fromOwned(item: OwnedCalculation): RecentRow {
     publicId: item.public_id,
     inputFilename: item.input_filename || "Uploaded workbook",
     createdAt: item.created_at,
-    batterySizeKwh: Number(item.result?.optimal_battery_size_kwh || 0),
-    annualSavingsAud: Number(item.result?.estimated_annual_bill_reduction_aud || 0),
+    batterySizeKwh: isCompleteBatteryResult(item.result) ? item.result.optimal_battery_size_kwh : null,
+    annualSavingsAud: isCompleteBatteryResult(item.result) ? item.result.estimated_annual_bill_reduction_aud : null,
     status: item.status,
     source: "account",
   };
@@ -65,6 +68,13 @@ export default function DashboardPage() {
       .slice(0,3);
   }, [recentOwned, recentLocal]);
 
+  async function startNew() {
+    clearDraft();
+    clearCachedTransientResult();
+    await clearDraftFile().catch(() => undefined);
+    window.location.assign("/calculator/load-solar");
+  }
+
   return (
     <AppShell>
       <section className="dashboard-hero">
@@ -86,11 +96,11 @@ export default function DashboardPage() {
       <section className="card">
         <div className="card-header"><h2>Recent Calculations</h2><a className="card-header-link" href="/results-history">View All <ArrowRight size={17}/></a></div>
         {recent.length===0 ? (
-          <div className="empty-state"><h3>No calculations yet</h3><p>Retained calculations will appear here after you choose to save a result.</p><a className="btn btn-primary" href="/calculator/load-solar">Start Calculation</a></div>
+          <div className="empty-state"><h3>No calculations yet</h3><p>Retained calculations will appear here after you choose to save a result.</p><button className="btn btn-primary" type="button" onClick={startNew}>Start Calculation</button></div>
         ) : (
           <div className="table-wrap"><table className="data-table"><thead><tr><th>Input</th><th>Date</th><th>Battery Size</th><th>Annual Savings</th><th>Access</th><th>Status</th></tr></thead><tbody>
             {recent.map((item)=><tr key={`${item.source}-${item.publicId}`} onDoubleClick={()=>window.location.assign(`/calculator/results?id=${item.publicId}`)}>
-              <td><strong>{item.inputFilename}</strong></td><td>{new Date(item.createdAt).toLocaleDateString()}</td><td><strong>{item.batterySizeKwh.toFixed(2)} kWh</strong></td><td><strong>${item.annualSavingsAud.toFixed(2)}</strong></td><td><span className={`access-pill ${item.source}`}>{item.source==="account"?"Account":"This browser"}</span></td><td><span className="status-pill">{item.status}</span></td>
+              <td><strong>{item.inputFilename}</strong></td><td>{new Date(item.createdAt).toLocaleDateString()}</td><td><strong>{item.batterySizeKwh === null ? "—" : `${item.batterySizeKwh.toFixed(2)} kWh`}</strong></td><td><strong>{item.annualSavingsAud === null ? "—" : `$${item.annualSavingsAud.toFixed(2)}`}</strong></td><td><span className={`access-pill ${item.source}`}>{item.source==="account"?"Account":"This browser"}</span></td><td><span className="status-pill">{item.status}</span></td>
             </tr>)}
           </tbody></table></div>
         )}

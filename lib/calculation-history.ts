@@ -1,4 +1,4 @@
-import type { CalculationResponse, LocalCalculation } from "./types";
+import { isCompleteBatteryResult, type CalculationResponse, type LocalCalculation } from "./types";
 
 const KEY = "smart-battery-calculation-history-v1";
 
@@ -49,7 +49,7 @@ export function listCalculationHistory(): LocalCalculation[] {
 }
 
 export function saveCalculationHistory(response: CalculationResponse, token: string) {
-  if (typeof window === "undefined" || !response.retained || !response.public_id || !token) return;
+  if (typeof window === "undefined" || !response.retained || !response.public_id || !token || !isCompleteBatteryResult(response.result)) return;
   const item: LocalCalculation = {
     publicId: response.public_id,
     accessToken: token,
