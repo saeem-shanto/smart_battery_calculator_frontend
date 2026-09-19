@@ -1,7 +1,3 @@
 import { NextResponse } from "next/server";
-
-export async function POST() {
-  const response = NextResponse.json({ ok: true });
-  response.cookies.set("smart_battery_admin", "", { httpOnly: true, sameSite: "lax", path: "/", maxAge: 0 });
-  return response;
-}
+import { clearAdminTokens } from "@/lib/server/admin-backend";
+export async function POST() { await clearAdminTokens(); return NextResponse.json({ ok: true }); }

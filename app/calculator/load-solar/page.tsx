@@ -1,74 +1,101 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
-import { ArrowRight, CheckCircle2, ExternalLink, FileText, LoaderCircle, Upload } from "lucide-react";
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  FileSpreadsheet,
+  ShieldCheck,
+  Upload,
+} from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StepIndicator } from "@/components/StepIndicator";
-import { InlineIssue, ValidationSummary } from "@/components/ValidationSummary";
-import { analyzeCsv, getLoadProfiles } from "@/lib/api";
 import { getDraft, saveDraft } from "@/lib/draft";
-import { errorsOnly, validateLoadSolarInput, warningsOnly } from "@/lib/validation";
-import type { CsvSummary, LoadProfile, UsagePattern } from "@/lib/types";
+import { clearDraftFile, getDraftFile, saveDraftFile } from "@/lib/file-store";
+import { getApiFieldMessage, validateClientWorkbook } from "@/lib/api";
+import type { WorkbookValidationResponse } from "@/lib/types";
 
-const fallbackProfiles: LoadProfile[] = [
-  { id: "typical-adelaide", name: "Typical Adelaide Home", description: "Balanced household consumption with morning and evening peaks.", dailyUsageKWh: 18, pattern: "balanced" },
-  { id: "evening-heavy", name: "Evening Heavy Usage", description: "Higher consumption after 4 pm.", dailyUsageKWh: 24, pattern: "evening-heavy" },
-  { id: "daytime-heavy", name: "High Daytime Usage", description: "Higher consumption while solar is generating.", dailyUsageKWh: 28, pattern: "daytime-heavy" },
-];
-
-type Mode = "csv" | "manual" | "sample";
+const MAX_MB = 15;
+type FieldErrors = { file?: string; postcode?: string };
 
 export default function LoadSolarPage() {
-  const [mode, setMode] = useState<Mode>("manual");
-  const [profiles, setProfiles] = useState<LoadProfile[]>(fallbackProfiles);
-  const [sampleProfileId, setSampleProfileId] = useState(fallbackProfiles[0].id);
-  const [csvSummary, setCsvSummary] = useState<CsvSummary | null>(null);
-  const [manualDailyUsage, setManualDailyUsage] = useState("18");
-  const [manualPattern, setManualPattern] = useState<UsagePattern>("balanced");
-  const [pvSize, setPvSize] = useState("6.6");
-  const [fileError, setFileError] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
+  const [fileName, setFileName] = useState("");
+  const [fileSize, setFileSize] = useState(0);
+  const [postcode, setPostcode] = useState("");
+  const [suburb, setSuburb] = useState("");
+  const [state, setState] = useState("SA");
+  const [retainData, setRetainData] = useState(false);
+  const [validation, setValidation] = useState<WorkbookValidationResponse | null>(null);
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [saving, setSaving] = useState(false);
+
+  const uploadRef = useRef<HTMLLabelElement>(null);
+  const postcodeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const draft = getDraft();
-    if (draft.loadMode) setMode(draft.loadMode);
-    if (draft.sampleProfileId) setSampleProfileId(draft.sampleProfileId);
-    if (draft.csvSummary) setCsvSummary(draft.csvSummary);
-    if (draft.manualDailyUsageKWh !== undefined) setManualDailyUsage(String(draft.manualDailyUsageKWh));
-    if (draft.manualPattern) setManualPattern(draft.manualPattern);
-    if (draft.pvSize !== undefined) setPvSize(String(draft.pvSize));
+    setFileName(draft.inputFileName || "");
+    setFileSize(draft.inputFileSize || 0);
+    setPostcode(draft.postcode || "");
+    setSuburb(draft.suburb || "");
+    setState(draft.state || "SA");
+    setRetainData(draft.retainData === true);
+    setValidation(draft.workbookValidation || null);
 
-    getLoadProfiles().then((data) => {
-      if (!data.profiles.length) return;
-      setProfiles(data.profiles);
-      if (!draft.sampleProfileId) setSampleProfileId(data.profiles[0].id);
-    }).catch(() => undefined);
+    getDraftFile()
+      .then((file) => {
+        if (!file) return;
+        setFileName(file.name);
+        setFileSize(file.size);
+        if (draft.workbookValidation?.original_name !== file.name || draft.inputFileSize !== file.size) setValidation(null);
+      })
+      .catch(() => undefined);
   }, []);
 
-  const selectedProfile = useMemo(
-    () => profiles.find((profile) => profile.id === sampleProfileId) ?? profiles[0],
-    [profiles, sampleProfileId],
-  );
+  function reveal(element: HTMLElement | null) {
+    if (!element) return;
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => element.focus({ preventScroll: true }), 250);
+  }
 
-  const issues = useMemo(() => validateLoadSolarInput({
-    mode,
-    csvSummary,
-    manualDailyUsage,
-    manualPattern,
-    selectedProfile,
-    pvSize,
-  }), [mode, csvSummary, manualDailyUsage, manualPattern, selectedProfile, pvSize]);
+  async function validateAndStore(file: File): Promise<boolean> {
+    setSaving(true);
+    setErrors((current) => ({ ...current, file: undefined }));
+    setValidation(null);
 
-  const visibleIssues = useMemo(() => [
-    ...(submitted ? errorsOnly(issues) : []),
-    ...warningsOnly(issues),
-  ], [issues, submitted]);
-
-  function switchMode(next: Mode) {
-    setMode(next);
-    setFileError("");
-    setSubmitted(false);
+    try {
+      const checked = await validateClientWorkbook(file);
+      await saveDraftFile(file);
+      setFileName(file.name);
+      setFileSize(file.size);
+      setValidation(checked);
+      saveDraft({
+        inputFileName: file.name,
+        inputFileSize: file.size,
+        workbookValidation: checked,
+        publicId: undefined,
+        accessToken: undefined,
+      });
+      return true;
+    } catch (error) {
+      const message = getApiFieldMessage(error, "file") || (error instanceof Error ? error.message : "The workbook could not be validated.");
+      await clearDraftFile().catch(() => undefined);
+      setFileName(file.name);
+      setFileSize(file.size);
+      setValidation(null);
+      setErrors((current) => ({ ...current, file: message }));
+      saveDraft({
+        inputFileName: undefined,
+        inputFileSize: undefined,
+        workbookValidation: undefined,
+        publicId: undefined,
+        accessToken: undefined,
+      });
+      reveal(uploadRef.current);
+      return false;
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function onFile(event: ChangeEvent<HTMLInputElement>) {
@@ -76,49 +103,59 @@ export default function LoadSolarPage() {
     event.target.value = "";
     if (!file) return;
 
-    setFileError("");
-    const extensionOkay = file.name.toLowerCase().endsWith(".csv");
-    const mimeOkay = !file.type || file.type === "text/csv" || file.type === "application/vnd.ms-excel" || file.type === "text/plain";
-    if (!extensionOkay) return setFileError("Only .csv files are accepted.");
-    if (!mimeOkay) return setFileError("This file does not appear to be a CSV. Export it as CSV and try again.");
-    if (file.size === 0) return setFileError("The selected CSV is empty.");
-    if (file.size > 5_000_000) return setFileError("CSV files must be smaller than 5 MB in this prototype.");
-
-    setAnalyzing(true);
-    try {
-      const text = await file.text();
-      if (!text.trim()) throw new Error("The selected CSV is empty.");
-      const response = await analyzeCsv(file.name, text);
-      setCsvSummary(response.summary);
-      setMode("csv");
-    } catch (err) {
-      setCsvSummary(null);
-      setFileError(err instanceof Error ? err.message : "Could not analyse the CSV.");
-    } finally {
-      setAnalyzing(false);
+    const extension = file.name.toLowerCase().split(".").pop();
+    let message = "";
+    if (!["xls", "xlsx", "csv", "txt"].includes(extension || "")) {
+      message = "Upload an XLS, XLSX, CSV, or TXT profile file.";
+    } else if (file.size === 0) {
+      message = "The selected file is empty.";
+    } else if (file.size > MAX_MB * 1024 * 1024) {
+      message = `File must be ${MAX_MB} MB or smaller.`;
     }
-  }
 
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    setSubmitted(true);
-    if (fileError || errorsOnly(issues).length) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
+    if (message) {
+      setFileName(file.name);
+      setFileSize(file.size);
+      setValidation(null);
+      setErrors((current) => ({ ...current, file: message }));
+      reveal(uploadRef.current);
       return;
     }
 
-    const pv = Number(pvSize);
-    const manualKWh = Number(manualDailyUsage);
+    await validateAndStore(file);
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const nextErrors: FieldErrors = {};
+    const file = await getDraftFile().catch(() => null);
+
+    if (!file || !fileName) nextErrors.file = "Choose the household/PV input file first.";
+    if (postcode && !/^\d{4}$/.test(postcode)) nextErrors.postcode = "Postcode must be a 4-digit Australian postcode.";
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      if (nextErrors.file) reveal(uploadRef.current);
+      else if (nextErrors.postcode) reveal(postcodeRef.current);
+      return;
+    }
+
+    if (file && !validation) {
+      const valid = await validateAndStore(file);
+      if (!valid) return;
+    }
+
+    setErrors({});
     saveDraft({
-      loadMode: mode,
-      fileName: mode === "csv" ? csvSummary?.fileName : undefined,
-      csvSummary: mode === "csv" ? csvSummary ?? undefined : undefined,
-      manualDailyUsageKWh: mode === "manual" ? manualKWh : undefined,
-      manualPattern: mode === "manual" ? manualPattern : undefined,
-      sampleProfileId: mode === "sample" ? selectedProfile?.id : undefined,
-      sampleProfile: mode === "sample" ? selectedProfile?.name : undefined,
-      sampleDailyUsageKWh: mode === "sample" ? selectedProfile?.dailyUsageKWh : undefined,
-      pvSize: pv,
+      inputFileName: fileName,
+      inputFileSize: fileSize,
+      postcode: postcode.trim(),
+      suburb: suburb.trim(),
+      state: state.trim(),
+      retainData,
+      consent: undefined,
+      publicId: undefined,
+      accessToken: undefined,
     });
     window.location.assign("/calculator/tariff");
   }
@@ -126,86 +163,131 @@ export default function LoadSolarPage() {
   return (
     <AppShell>
       <form onSubmit={submit} noValidate>
-        <div className="step-heading"><h1>New Calculation</h1><p>Step 1 of 4</p></div>
+        <div className="step-heading">
+          <h1>New Calculation</h1>
+          <p>Step 1 of 4</p>
+        </div>
         <StepIndicator current={1} />
-        {fileError && <div className="validation-summary error" role="alert"><div><strong>CSV error:</strong><div>{fileError}</div></div></div>}
-        <ValidationSummary issues={visibleIssues} />
 
         <section className="section-card">
-          <h2 className="section-title">1. Load Profile (Electricity Usage)</h2>
-          <p className="section-subtitle">Upload interval data, enter simple household usage, or use a demo profile.</p>
+          <h2 className="section-title">Upload annual load &amp; PV data</h2>
+          <p className="section-subtitle">
+            The client algorithm uses the first column as the base PV profile and the second column as household load. A complete annual profile is required.
+          </p>
 
-          <div className={`option-card ${mode === "csv" ? "selected" : ""}`} onClick={() => switchMode("csv")} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") switchMode("csv"); }}>
-            <input aria-label="Upload CSV mode" type="radio" name="mode" checked={mode === "csv"} onChange={() => switchMode("csv")} />
-            <span className="option-content"><strong>Upload my data (CSV)</strong><span>{csvSummary ? `Ready: ${csvSummary.fileName}` : "Upload electricity usage data such as smart-meter interval readings."}</span></span>
-            <label className={`btn btn-outline-green ${analyzing ? "disabled" : ""}`} htmlFor="csv-file" onClick={(e) => e.stopPropagation()}>
-              {analyzing ? <LoaderCircle className="spin" size={18} /> : <Upload size={18} />} {analyzing ? "Analyzing..." : "Upload CSV"}
-            </label>
-            <input id="csv-file" type="file" accept=".csv,text/csv" onChange={onFile} hidden disabled={analyzing} />
-          </div>
-          {mode === "csv" && <InlineIssue issues={visibleIssues} field="csv" />}
+          <label
+            ref={uploadRef}
+            className={`production-upload ${errors.file ? "input-error" : ""}`}
+            htmlFor="profile-file"
+            tabIndex={-1}
+            aria-invalid={Boolean(errors.file)}
+          >
+            <div className="production-upload-icon"><Upload size={26} /></div>
+            <div>
+              <strong>{fileName || "Choose input file"}</strong>
+              <span>
+                {fileName
+                  ? `${(fileSize / 1024).toFixed(1)} KB · ${saving ? "validating with backend…" : validation ? "validated and ready" : "awaiting validation"}`
+                  : "Accepted: .xls, .xlsx, .csv, .txt · up to 15 MB"}
+              </span>
+            </div>
+            <span className="btn btn-outline-green">{saving ? "Validating…" : "Select File"}</span>
+          </label>
+          <input
+            id="profile-file"
+            type="file"
+            accept=".xls,.xlsx,.csv,.txt"
+            hidden
+            onChange={onFile}
+            disabled={saving}
+          />
+          {errors.file && <div className="field-message error" role="alert">{errors.file}</div>}
 
-          {mode === "csv" && csvSummary && (
-            <div className="upload-summary" aria-live="polite"><CheckCircle2 size={19} /><div><strong>{csvSummary.fileName}</strong><span>{csvSummary.rowCount.toLocaleString()} rows · {csvSummary.totalKWh.toLocaleString()} kWh in file · estimated {csvSummary.averageDailyKWh.toLocaleString()} kWh/day</span></div></div>
-          )}
-
-          <div className={`option-card ${mode === "manual" ? "selected" : ""}`} onClick={() => switchMode("manual")} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") switchMode("manual"); }}>
-            <input aria-label="Simple data mode" type="radio" name="mode" checked={mode === "manual"} onChange={() => switchMode("manual")} />
-            <span className="option-content"><strong>Enter simple household data</strong><span>No CSV required. Enter average daily electricity use and a general usage pattern.</span></span>
-          </div>
-
-          {mode === "manual" && (
-            <div className="simple-data-grid">
-              <div className="field">
-                <label htmlFor="daily-usage">Average Daily Electricity Usage</label>
-                <div className="input-wrap"><input id="daily-usage" className={`input has-unit ${visibleIssues.some((i) => i.field === "manualDailyUsage" && i.level === "error") ? "input-error" : ""}`} type="number" min="1" max="100" step="0.1" value={manualDailyUsage} onChange={(e) => { setManualDailyUsage(e.target.value); }} /><span className="input-unit">kWh/day</span></div>
-                <div className="field-help">If you only know monthly usage, divide it by about 30.</div>
-                <InlineIssue issues={visibleIssues} field="manualDailyUsage" />
-              </div>
-              <div className="field">
-                <label htmlFor="usage-pattern">Typical Usage Pattern</label>
-                <select id="usage-pattern" className="input" value={manualPattern} onChange={(e) => setManualPattern(e.target.value as UsagePattern)}>
-                  <option value="balanced">Balanced — morning & evening use</option>
-                  <option value="evening-heavy">Evening-heavy — more use after 4 pm</option>
-                  <option value="daytime-heavy">Daytime-heavy — more use while solar generates</option>
-                </select>
-                <InlineIssue issues={visibleIssues} field="manualPattern" />
+          {validation && (
+            <div className="upload-summary upload-summary-valid">
+              <CheckCircle2 size={19} />
+              <div>
+                <strong>Workbook validated</strong>
+                <span>
+                  {validation.row_count.toLocaleString()} usable rows · {validation.detected_format.toUpperCase()}
+                  {validation.profile_is_full_year ? " · complete annual profile" : ""}
+                </span>
+                {validation.warnings.length > 0 && <small>{validation.warnings.join(" ")}</small>}
               </div>
             </div>
           )}
-
-          <div className={`option-card compact-option ${mode === "sample" ? "selected" : ""}`} onClick={() => switchMode("sample")} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") switchMode("sample"); }}>
-            <input aria-label="Sample profile mode" type="radio" name="mode" checked={mode === "sample"} onChange={() => switchMode("sample")} />
-            <span className="option-content"><strong>Use a sample profile</strong><span>Quick demo data for testing the complete flow.</span></span>
-          </div>
-
-          {mode === "sample" && selectedProfile && (
-            <div className="field sample-select">
-              <label htmlFor="sample-profile">Sample Profile</label>
-              <select id="sample-profile" className="input" value={sampleProfileId} onChange={(e) => setSampleProfileId(e.target.value)}>{profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select>
-              <div className="field-help">{selectedProfile.description} Demo average: <strong>{selectedProfile.dailyUsageKWh} kWh/day</strong>.</div>
-              <InlineIssue issues={visibleIssues} field="sampleProfile" />
-            </div>
-          )}
-
-          <details className="format-details" id="data-format">
-            <summary>Learn more about CSV data format <ExternalLink size={15} /></summary>
-            <div><FileText size={17} /><p>A CSV needs a header and a numeric usage column such as <code>kWh</code>, <code>Usage</code>, <code>Energy</code> or <code>Consumption</code>. Negative values, empty files, unsupported columns, and files above 5 MB are rejected. <a className="inline-link" href="/sample-electricity-usage.csv" download>Download the sample CSV</a>.</p></div>
-          </details>
         </section>
 
         <section className="section-card">
-          <h2 className="section-title">2. Solar PV System</h2>
-          <p className="section-subtitle">Enter your existing or planned solar system size.</p>
-          <div className="field">
-            <label htmlFor="pv">PV System Size (kW)</label>
-            <div className="input-wrap"><input id="pv" className={`input has-unit ${visibleIssues.some((i) => i.field === "pvSize" && i.level === "error") ? "input-error" : ""}`} type="number" min="1" max="30" step="0.1" value={pvSize} onChange={(e) => { setPvSize(e.target.value); }} placeholder="e.g. 6.6" /><span className="input-unit">kW</span></div>
-            <div className="field-help">Allowed demo range: 1–30 kW.</div>
-            <InlineIssue issues={visibleIssues} field="pvSize" />
+          <h2 className="section-title">Location &amp; record information</h2>
+          <p className="section-subtitle">
+            These fields do not change the optimisation. If retention is enabled, they help identify the calculation later.
+          </p>
+          <div className="form-grid">
+            <div className="field">
+              <label htmlFor="postcode">Postcode</label>
+              <input
+                ref={postcodeRef}
+                id="postcode"
+                className={`input ${errors.postcode ? "input-error" : ""}`}
+                inputMode="numeric"
+                maxLength={4}
+                value={postcode}
+                aria-invalid={Boolean(errors.postcode)}
+                aria-describedby={errors.postcode ? "postcode-error" : undefined}
+                onChange={(event) => {
+                  setPostcode(event.target.value.replace(/\D/g, ""));
+                  setErrors((current) => ({ ...current, postcode: undefined }));
+                }}
+                placeholder="e.g. 5000"
+              />
+              {errors.postcode && <div id="postcode-error" className="field-message error">{errors.postcode}</div>}
+            </div>
+            <div className="field">
+              <label htmlFor="suburb">Suburb</label>
+              <input id="suburb" className="input" maxLength={120} value={suburb} onChange={(event) => setSuburb(event.target.value)} placeholder="e.g. Adelaide" />
+            </div>
+            <div className="field">
+              <label htmlFor="state">State</label>
+              <select id="state" className="input" value={state} onChange={(event) => setState(event.target.value)}>
+                <option>SA</option><option>NSW</option><option>VIC</option><option>QLD</option><option>WA</option><option>TAS</option><option>ACT</option><option>NT</option>
+              </select>
+            </div>
           </div>
         </section>
 
-        <div className="button-row"><span /><button className="btn btn-primary btn-lg" type="submit" disabled={analyzing}>Next: Tariff <ArrowRight size={19} /></button></div>
+        <section className="section-card retention-section">
+          <div className="retention-heading">
+            <div>
+              <h2 className="section-title">Privacy &amp; data retention</h2>
+              <p className="section-subtitle">Saving is optional. The calculator can return a result without keeping your household file on the backend.</p>
+            </div>
+            <ShieldCheck size={24} />
+          </div>
+          <label className="consent-row retention-toggle">
+            <input type="checkbox" checked={retainData} onChange={(event) => setRetainData(event.target.checked)} />
+            <span>
+              <strong>Save my uploaded file and calculation for later access.</strong>
+              <small>If enabled, the backend retains the input, calculation record and canonical result CSV. If disabled, processing is transient and no calculation/file record is stored server-side.</small>
+            </span>
+          </label>
+        </section>
+
+        <div className="notice">
+          <FileSpreadsheet size={17} />
+          <span>
+            {retainData
+              ? "Retention is ON: after calculation, the backend will keep the uploaded input and result artifacts for later access."
+              : "Retention is OFF: the backend will process the workbook transiently and return the result without saving the household file or calculation record."}
+          </span>
+        </div>
+
+        <div className="button-row">
+          <span />
+          <button className="btn btn-primary btn-lg" type="submit" disabled={saving}>
+            {saving ? "Validating…" : "Next: Algorithm"} <ArrowRight size={18} />
+          </button>
+        </div>
       </form>
     </AppShell>
   );

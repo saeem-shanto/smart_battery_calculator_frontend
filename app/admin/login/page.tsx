@@ -9,11 +9,13 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [working, setWorking] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("loggedOut") === "1") setError("");
+    if (params.get("loggedOut") === "1") setNotice("You have been signed out.");
+    if (params.get("passwordChanged") === "1") setNotice("Password changed successfully. Sign in again with the new password.");
   }, []);
 
   async function submit(event: FormEvent) {
@@ -48,7 +50,8 @@ export default function AdminLoginPage() {
         <BrandLogo />
         <div className="admin-login-icon"><ShieldCheck size={30} /></div>
         <h1>Admin Login</h1>
-        <p>Sign in to the separate administration dashboard.</p>
+        <p>Sign in with your Django staff account to manage calculation records and stored files.</p>
+        {notice && <div className="success-box" role="status">{notice}</div>}
         {error && <div className="error-box" role="alert"><strong>Login error</strong><span>{error}</span></div>}
         <form onSubmit={submit} noValidate className="admin-login-form">
           <div className="field">
@@ -61,7 +64,7 @@ export default function AdminLoginPage() {
           </div>
           <button className="btn btn-primary btn-lg admin-login-button" type="submit" disabled={working}>{working ? "Signing in..." : "Sign In"}</button>
         </form>
-        <div className="admin-security-note"><LockKeyhole size={16}/><span>This is a development-only demo login. Replace the hard-coded credentials with real authentication before deployment.</span></div>
+        <div className="admin-security-note"><LockKeyhole size={16}/><span>Credentials are verified by the Django backend. Access and refresh tokens are kept in secure HttpOnly cookies by the Next.js server.</span></div>
         <a className="admin-back-link" href="/dashboard">← Back to user dashboard</a>
       </section>
     </main>

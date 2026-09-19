@@ -1,173 +1,167 @@
 "use client";
+import type {
+  BackendTariff,
+  CalculationResponse,
+  DraftCalculation,
+  WorkbookValidationResponse,
+} from "./types";
 
-import tariffData from "@/data/mock/tariffs.json";
-import loadProfileData from "@/data/mock/load-profiles.json";
-import seedData from "@/data/mock/scenarios.json";
-import { analyzeCsvText } from "@/lib/csv-analyzer";
-import { runDummyCalculation, validateDraft } from "@/lib/dummy-calculator";
-import {
-  createLocalScenario,
-  deleteLocalScenario,
-  hasScenarioStore,
-  readScenarioStore,
-  updateLocalScenario,
-  writeScenarioStore,
-} from "@/lib/client-store";
-import type { CalculationResult, CsvSummary, DraftCalculation, LoadProfile, Scenario, Tariff } from "./types";
+const PUBLIC_BACKEND = (process.env.NEXT_PUBLIC_BACKEND_API_URL || "").replace(/\/$/, "");
+const url = (backendPath: string, proxyPath: string) =>
+  PUBLIC_BACKEND ? `${PUBLIC_BACKEND}${backendPath}` : proxyPath;
 
-const NETWORK_TIMEOUT_MS = 900;
-const seedScenarios = seedData.scenarios as unknown as Scenario[];
+type ErrorPayload = {
+  error?: {
+    code?: string;
+    message?: string;
+    fields?: Record<string, unknown> | null;
+    request_id?: string | null;
+  };
+};
 
-async function json<T>(response: Response): Promise<T> {
-  const payload = await response.json().catch(() => null) as ({ error?: string } & T) | null;
-  if (!response.ok) throw new Error(payload?.error || `API request failed with ${response.status}`);
-  if (!payload) throw new Error("The API returned an empty response.");
-  return payload;
-}
+export class ApiRequestError extends Error {
+  status: number;
+  code?: string;
+  fields?: Record<string, unknown> | null;
 
-async function fetchWithTimeout<T>(url: string, init?: RequestInit, timeoutMs = NETWORK_TIMEOUT_MS): Promise<T> {
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await json<T>(await fetch(url, { ...init, signal: controller.signal, cache: "no-store" }));
-  } finally {
-    window.clearTimeout(timer);
+  constructor(message: string, status: number, options?: { code?: string; fields?: Record<string, unknown> | null }) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+    this.code = options?.code;
+    this.fields = options?.fields;
   }
 }
 
-function fireAndForget(url: string, init?: RequestInit) {
-  if (typeof window === "undefined") return;
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 1200);
-  fetch(url, { ...init, signal: controller.signal, cache: "no-store" })
-    .catch(() => undefined)
-    .finally(() => window.clearTimeout(timer));
+function fieldText(value: unknown): string {
+  if (Array.isArray(value)) return value.map(String).join(" ");
+  if (value && typeof value === "object") return Object.values(value as Record<string, unknown>).map(fieldText).filter(Boolean).join(" ");
+  return value == null ? "" : String(value);
 }
 
-export async function getRecentCalculations() {
-  const scenarios = (await getScenarios()).scenarios;
-  return { scenarios: scenarios.slice(0, 3) };
+export function getApiFieldMessage(error: unknown, field: string): string | null {
+  if (!(error instanceof ApiRequestError) || !error.fields || !(field in error.fields)) return null;
+  return fieldText(error.fields[field]) || null;
 }
 
-export async function getLoadProfiles() {
-  const fallback = loadProfileData as { profiles: LoadProfile[] };
-  try {
-    return await fetchWithTimeout<{ profiles: LoadProfile[] }>("/api/load-profiles");
-  } catch {
-    return fallback;
+async function readJson<T>(response: Response): Promise<T> {
+  const payload = (await response.json().catch(() => null)) as ErrorPayload | T | null;
+  if (!response.ok) {
+    const error = payload && typeof payload === "object" && "error" in payload
+      ? (payload as ErrorPayload).error
+      : undefined;
+    const fields = error?.fields && typeof error.fields === "object" ? error.fields : null;
+    const details = fields
+      ? Object.entries(fields)
+          .map(([key, value]) => `${key}: ${fieldText(value)}`)
+          .filter((value) => !value.endsWith(": "))
+          .join(" ")
+      : "";
+    const message = [error?.message || `Request failed with HTTP ${response.status}.`, details].filter(Boolean).join(" ");
+    throw new ApiRequestError(message, response.status, { code: error?.code, fields });
   }
+  if (payload === null) throw new Error("The server returned an empty response.");
+  return payload as T;
 }
 
-export async function analyzeCsv(fileName: string, text: string) {
-  const local = () => analyzeCsvText(fileName, text);
-  try {
-    return await fetchWithTimeout<{ summary: CsvSummary; meta: { source: string; energyColumn: string; assumption: string } }>(
-      "/api/csv/analyze",
-      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fileName, text }) },
-      1500,
-    );
-  } catch {
-    return local();
-  }
+export async function getHealth() {
+  return readJson<{ status: string; calculation_engine: string }>(
+    await fetch(url("/api/v1/health/", "/api/system/health"), { cache: "no-store" }),
+  );
+}
+
+export async function getReadiness() {
+  return readJson<{ status: string; engine: { ready: boolean; octave_version?: string | null } }>(
+    await fetch(url("/api/v1/ready/", "/api/system/ready"), { cache: "no-store" }),
+  );
 }
 
 export async function getTariffs() {
-  const fallback = tariffData as { tariffs: Tariff[] };
-  try {
-    return await fetchWithTimeout<{ tariffs: Tariff[] }>("/api/tariffs");
-  } catch {
-    return fallback;
-  }
+  return readJson<BackendTariff[]>(
+    await fetch(url("/api/v1/tariffs/", "/api/tariffs"), { cache: "no-store" }),
+  );
 }
 
-export async function calculateBattery(input: DraftCalculation) {
-  const missing = validateDraft(input);
-  if (missing.length) throw new Error(`Complete these fields first: ${missing.join(", ")}.`);
-
-  const fallback = runDummyCalculation(input);
-  try {
-    return await fetchWithTimeout<CalculationResult>(
-      "/api/calculate",
-      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) },
-      1200,
-    );
-  } catch {
-    return fallback;
-  }
+export async function validateClientWorkbook(file: File) {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  return readJson<WorkbookValidationResponse>(
+    await fetch(url("/api/v1/profiles/client-workbook/validate/", "/api/profiles/client-workbook/validate"), {
+      method: "POST",
+      body: form,
+    }),
+  );
 }
 
-export async function getScenarios() {
-  if (typeof window === "undefined") return { scenarios: [...seedScenarios] };
-
-  // Browser storage is the source of truth for the prototype. This makes the UI
-  // work even if a development HMR/API connection is temporarily unavailable.
-  if (hasScenarioStore()) return { scenarios: readScenarioStore() };
-
-  try {
-    const response = await fetchWithTimeout<{ scenarios: Scenario[] }>("/api/scenarios", undefined, 800);
-    writeScenarioStore(response.scenarios);
-    return response;
-  } catch {
-    writeScenarioStore([...seedScenarios]);
-    return { scenarios: readScenarioStore() };
-  }
+export async function runWorkbookCalculation(draft: DraftCalculation, file: File) {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  form.append("retain_data", String(Boolean(draft.retainData)));
+  if (draft.postcode) form.append("postcode", draft.postcode);
+  if (draft.suburb) form.append("suburb", draft.suburb);
+  if (draft.state) form.append("state", draft.state);
+  form.append(
+    "metadata",
+    JSON.stringify({ frontend: "nextjs", workflow: "client_workbook", retention_requested: Boolean(draft.retainData) }),
+  );
+  form.append("battery_installed_cost_per_kwh", String(draft.batteryInstalledCostPerKwh ?? 1000));
+  return readJson<CalculationResponse>(
+    await fetch("/api/calculations/client-workbook", {
+      method: "POST",
+      body: form,
+    }),
+  );
 }
 
-export async function getScenario(id: number) {
-  const scenarios = (await getScenarios()).scenarios;
-  const scenario = scenarios.find((item) => item.id === id);
-  if (!scenario) throw new Error("Scenario not found.");
-  return { scenario };
+export async function getCalculation(publicId: string, token?: string | null) {
+  const headers = new Headers();
+  if (token) headers.set("X-Calculation-Token", token);
+  return readJson<CalculationResponse>(
+    await fetch(`/api/calculations/${publicId}`, { headers, cache: "no-store" }),
+  );
 }
 
-export async function saveScenario(input: {
-  name: string;
-  recommendedBatterySize: number;
-  annualBillReduction: number;
-  calculationInput?: DraftCalculation;
-  calculationResult?: CalculationResult;
-}) {
-  const name = input.name.trim();
-  if (!name) throw new Error("Scenario name is required.");
-  if (name.length > 80) throw new Error("Scenario name must be 80 characters or fewer.");
-  if (!Number.isFinite(input.recommendedBatterySize) || input.recommendedBatterySize <= 0 || input.recommendedBatterySize > 100) throw new Error("Battery size must be between 0 and 100 kWh.");
-  if (!Number.isFinite(input.annualBillReduction) || input.annualBillReduction < 0 || input.annualBillReduction > 1_000_000) throw new Error("Annual savings must be between $0 and $1,000,000.");
-  const local = createLocalScenario({ ...input, name });
-  fireAndForget("/api/scenarios", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...input, name }),
-  });
-  return { ok: true, ...local };
+export async function deleteCalculation(publicId: string, token?: string | null) {
+  const headers = new Headers();
+  if (token) headers.set("X-Calculation-Token", token);
+  const response = await fetch(`/api/calculations/${publicId}`, { method: "DELETE", headers });
+  if (!response.ok) await readJson(response);
 }
 
-export async function updateScenario(id: number, update: { name?: string; batterySize?: number; annualSavings?: number }) {
-  if (!Number.isInteger(id) || id <= 0) throw new Error("A valid scenario id is required.");
-  if (update.name !== undefined) {
-    const name = update.name.trim();
-    if (!name) throw new Error("Scenario name cannot be empty.");
-    if (name.length > 80) throw new Error("Scenario name must be 80 characters or fewer.");
-    update = { ...update, name };
-  }
-  if (update.batterySize !== undefined && (!Number.isFinite(update.batterySize) || update.batterySize <= 0 || update.batterySize > 100)) throw new Error("Battery size must be between 0 and 100 kWh.");
-  if (update.annualSavings !== undefined && (!Number.isFinite(update.annualSavings) || update.annualSavings < 0 || update.annualSavings > 1_000_000)) throw new Error("Annual savings must be between $0 and $1,000,000.");
-  const local = updateLocalScenario(id, update);
-  if (!local.scenario) throw new Error("Scenario not found.");
-  fireAndForget(`/api/scenarios?id=${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(update),
-  });
-  return { ok: true, scenario: local.scenario, scenarios: local.scenarios };
+export async function downloadCalculationFile(
+  publicId: string,
+  fileId: string,
+  token: string | null | undefined,
+  fallbackName: string,
+) {
+  const headers = new Headers();
+  if (token) headers.set("X-Calculation-Token", token);
+  const response = await fetch(
+    `/api/calculations/${publicId}/files/${fileId}/download`,
+    { headers },
+  );
+  if (!response.ok) await readJson(response);
+  const blob = await response.blob();
+  const disposition = response.headers.get("content-disposition") || "";
+  const match = disposition.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i);
+  const filename = match ? decodeURIComponent(match[1].replace(/\"/g, "")) : fallbackName;
+  downloadBlob(blob, filename);
 }
 
-export async function renameScenario(id: number, name: string) {
-  return updateScenario(id, { name });
+export function downloadTransientCsv(base64Data: string, filename: string, contentType = "text/csv") {
+  const binary = window.atob(base64Data);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  downloadBlob(new Blob([bytes], { type: contentType }), filename);
 }
 
-export async function deleteScenario(id: number) {
-  const local = deleteLocalScenario(id);
-  if (!local.deleted) throw new Error("Scenario not found.");
-  fireAndForget(`/api/scenarios?id=${id}`, { method: "DELETE" });
-  return { ok: true, scenarios: local.scenarios };
+function downloadBlob(blob: Blob, filename: string) {
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
 }

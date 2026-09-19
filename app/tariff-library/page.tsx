@@ -1,43 +1,8 @@
 "use client";
-
 import { useEffect, useState } from "react";
-import { ArrowRight, LibraryBig } from "lucide-react";
+import { LibraryBig } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { getTariffs } from "@/lib/api";
-import { clearDraft } from "@/lib/draft";
-import tariffData from "@/data/mock/tariffs.json";
-import type { Tariff } from "@/lib/types";
+import type { BackendTariff } from "@/lib/types";
 
-export default function TariffLibraryPage() {
-  const [tariffs, setTariffs] = useState<Tariff[]>(tariffData.tariffs as unknown as Tariff[]);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    getTariffs().then((data) => setTariffs(data.tariffs)).catch((err) => {
-      setTariffs([]);
-      setError(err instanceof Error ? err.message : "Could not load tariffs.");
-    });
-  }, []);
-
-  function useTariff(tariff: Tariff) {
-    clearDraft();
-    sessionStorage.setItem("smart-battery-preferred-tariff", tariff.id);
-    window.location.assign("/calculator/load-solar");
-  }
-
-  return (
-    <AppShell>
-      <div className="page-header"><h1>Tariff Library</h1><p>Dummy electricity tariffs available to the frontend prototype.</p></div>
-      {error && <div className="error-box page-card-space">{error}</div>}
-      <div className="library-grid">
-          {tariffs.map((tariff) => <article className="library-card" key={tariff.id}>
-            <div className="library-icon"><LibraryBig size={23}/></div>
-            <div><span className="eyebrow">{tariff.provider || "Demo provider"}</span><h2>{tariff.type}</h2><p>{tariff.description || "Demonstration electricity tariff."}</p></div>
-            <div className="rate-grid"><span><small>Peak</small><strong>${tariff.peak.toFixed(2)}/kWh</strong></span><span><small>Shoulder</small><strong>${tariff.shoulder.toFixed(2)}/kWh</strong></span><span><small>Off-Peak</small><strong>${tariff.offPeak.toFixed(2)}/kWh</strong></span><span><small>Feed-in</small><strong>${tariff.feedIn.toFixed(2)}/kWh</strong></span></div>
-            <button className="btn btn-primary" onClick={() => useTariff(tariff)}>Use in New Calculation <ArrowRight size={17}/></button>
-          </article>)}
-        </div>
-      <div className="notice">These are deliberately dummy values for UI development and must not be presented as current retailer offers.</div>
-    </AppShell>
-  );
-}
+export default function TariffLibraryPage(){const [items,setItems]=useState<BackendTariff[]>([]);const [error,setError]=useState("");useEffect(()=>{getTariffs().then(setItems).catch(err=>setError(err instanceof Error?err.message:"Could not load tariffs."));},[]);return <AppShell><div className="page-header"><h1>Tariff Library</h1><p>Active tariff records from the Django backend. These are reference data; the immutable client optimisation currently uses its own fixed retail and feed-in rates.</p></div>{error&&<div className="error-box">{error}</div>}{items.length===0&&!error?<div className="empty-state"><h3>No active tariffs</h3><p>The admin can create tariff reference records from the backend.</p></div>:<div className="library-grid">{items.map(item=><article className="library-card" key={item.id}><div className="library-icon"><LibraryBig size={22}/></div><div><div className="eyebrow">{item.provider||"Tariff"}</div><h2>{item.name}</h2><p>{item.notes||item.kind}</p></div><div className="rate-grid"><span><small>Flat/Peak</small><strong>${Number(item.flat_import_rate??item.peak_import_rate??0).toFixed(3)}/kWh</strong></span><span><small>Feed-in</small><strong>${Number(item.feed_in_rate??0).toFixed(3)}/kWh</strong></span><span><small>Demand</small><strong>${Number(item.demand_charge_rate_per_kw_day??0).toFixed(2)}/kW/day</strong></span><span><small>Type</small><strong>{item.kind}</strong></span></div></article>)}</div>}<div className="notice page-card-space">Current production calculations preserve the client MATLAB constants: retail <strong>$0.3773/kWh</strong> and feed-in tariff <strong>$0.124/kWh</strong>.</div></AppShell>}

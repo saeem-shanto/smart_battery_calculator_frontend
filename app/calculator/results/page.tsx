@@ -1,145 +1,291 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ArrowRight, BarChart3, BatteryCharging, Bookmark, CircleDollarSign, Coins, Save, X } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BarChart3,
+  BatteryCharging,
+  CircleDollarSign,
+  Download,
+  FileSpreadsheet,
+  Gauge,
+  RefreshCcw,
+  ShieldCheck,
+} from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StepIndicator } from "@/components/StepIndicator";
-import { BillComparisonChart, SavingsLineChart } from "@/components/Charts";
-import { calculateBattery, saveScenario } from "@/lib/api";
-import { runDummyCalculation } from "@/lib/dummy-calculator";
-import { validateDraftDetailed } from "@/lib/validation";
-import { clearDraft, getDraft } from "@/lib/draft";
-import type { CalculationResult, DraftCalculation } from "@/lib/types";
+import { BillComparisonChart } from "@/components/Charts";
+import { clearDraft, getDraft, saveDraft } from "@/lib/draft";
+import { clearDraftFile, getDraftFile } from "@/lib/file-store";
+import {
+  downloadCalculationFile,
+  downloadTransientCsv,
+  getCalculation,
+  runWorkbookCalculation,
+} from "@/lib/api";
+import { getHistoryItem, saveCalculationHistory } from "@/lib/calculation-history";
+import type { CalculationResponse } from "@/lib/types";
 
 export default function ResultsPage() {
-  const [draft, setDraft] = useState<DraftCalculation>({});
-  const [result, setResult] = useState<CalculationResult | null>(null);
+  const [data, setData] = useState<CalculationResponse | null>(null);
+  const [token, setToken] = useState("");
   const [error, setError] = useState("");
-  const [saveOpen, setSaveOpen] = useState(false);
-  const [scenarioName, setScenarioName] = useState("My New Scenario");
-  const [saving, setSaving] = useState(false);
-  const [savedName, setSavedName] = useState("");
-  const [saveError, setSaveError] = useState("");
-  const [apiStatus, setApiStatus] = useState("Preparing dummy result...");
+  const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState("");
 
   useEffect(() => {
-    const current = getDraft();
-    setDraft(current);
-    const validationErrors = validateDraftDetailed(current).filter((issue) => issue.level === "error");
-    if (validationErrors.length) {
-      setError(validationErrors.map((issue) => issue.message).join(" "));
-      return;
-    }
+    let cancelled = false;
 
-    // Render a deterministic local result immediately, then refresh it from the
-    // dummy endpoint if that endpoint is available. This prevents infinite loading.
-    const immediate = runDummyCalculation(current);
-    setResult(immediate);
-    setApiStatus("Result ready from browser fallback. Checking dummy API...");
+    (async () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const requested = params.get("id");
+        if (requested) {
+          const item = getHistoryItem(requested);
+          const response = await getCalculation(requested, item?.accessToken);
+          if (cancelled) return;
+          setData(response);
+          setToken(item?.accessToken || "");
+          return;
+        }
 
-    calculateBattery(current)
-      .then((response) => {
-        setResult(response);
-        setApiStatus("Dummy calculation API connected successfully.");
-      })
-      .catch(() => {
-        setApiStatus("Dummy API was unavailable, so the browser fallback result is shown. The page remains fully functional.");
-      });
+        const draft = getDraft();
+        if (draft.publicId) {
+          const response = await getCalculation(draft.publicId, draft.accessToken);
+          if (cancelled) return;
+          setData(response);
+          setToken(draft.accessToken || "");
+          if (draft.accessToken) saveCalculationHistory(response, draft.accessToken);
+          return;
+        }
+
+        const file = await getDraftFile();
+        if (!file) throw new Error("The uploaded input file is no longer available. Return to Step 1 and select it again.");
+
+        const response = await runWorkbookCalculation(draft, file);
+        if (cancelled) return;
+        setData(response);
+
+        if (response.retained) {
+          const publicId = response.public_id;
+          const access = response.access_token;
+          if (!publicId || !access) throw new Error("The backend retained the calculation but did not return its private access credentials.");
+          setToken(access);
+          saveDraft({ publicId, accessToken: access });
+          saveCalculationHistory(response, access);
+        } else {
+          setToken("");
+          saveDraft({ publicId: undefined, accessToken: undefined });
+        }
+      } catch (caught) {
+        if (!cancelled) setError(caught instanceof Error ? caught.message : "The calculation could not be completed.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
   }, []);
 
-  const sourceLabel = useMemo(() => {
-    if (draft.loadMode === "csv") return draft.csvSummary?.fileName || "Uploaded CSV";
-    if (draft.loadMode === "manual") return `Simple data · ${draft.manualDailyUsageKWh ?? "—"} kWh/day`;
-    return draft.sampleProfile || "Sample profile";
-  }, [draft]);
+  const result = data?.result;
+  const location = useMemo(
+    () => [data?.suburb, data?.state, data?.postcode].filter(Boolean).join(", "),
+    [data],
+  );
 
-  async function handleSaveScenario() {
-    const name = scenarioName.trim();
-    if (!result) return;
-    if (!name) return setSaveError("Scenario name is required.");
-    if (name.length > 80) return setSaveError("Scenario name must be 80 characters or fewer.");
-    setSaving(true);
-    setSaveError("");
+  async function downloadStored(fileId: string, name: string) {
+    if (!data?.public_id) return;
+    setDownloading(fileId);
     try {
-      const response = await saveScenario({
-        name,
-        recommendedBatterySize: result.recommendedBatterySize,
-        annualBillReduction: result.annualBillReduction,
-        calculationInput: draft,
-        calculationResult: result,
-      });
-      setSavedName(response.scenario.name);
-      setSaveOpen(false);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Could not save scenario.");
+      await downloadCalculationFile(data.public_id, fileId, token, name);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Download failed.");
     } finally {
-      setSaving(false);
+      setDownloading("");
     }
   }
 
-  function startNew() {
+  function downloadTransient() {
+    if (!data?.transient_csv) return;
+    try {
+      downloadTransientCsv(
+        data.transient_csv.base64_data,
+        data.transient_csv.filename,
+        data.transient_csv.content_type,
+      );
+    } catch {
+      setError("The transient CSV could not be prepared for download.");
+    }
+  }
+
+  async function startNew() {
     clearDraft();
+    await clearDraftFile();
     window.location.assign("/calculator/load-solar");
+  }
+
+  if (loading) {
+    return (
+      <AppShell>
+        <div className="step-heading"><h1>New Calculation</h1><p>Step 4 of 4</p></div>
+        <StepIndicator current={4} />
+        <div className="calculation-loading">
+          <span className="spinner-dark" />
+          <h2>Running the battery optimisation…</h2>
+          <p>The backend is processing the annual profile with GNU Octave. Please keep this page open.</p>
+        </div>
+      </AppShell>
+    );
   }
 
   return (
     <AppShell>
-      <div className="step-heading"><h1>New Calculation</h1><p>Step 4 of 4</p></div>
+      <div className="step-heading"><h1>Calculation Results</h1><p>Step 4 of 4</p></div>
       <StepIndicator current={4} />
 
       {error && (
         <div className="error-box" role="alert">
-          <strong>Calculation could not run.</strong><div>{error}</div>
-          <button className="btn btn-small" onClick={() => window.location.assign("/calculator/load-solar")}>Return to Step 1</button>
+          <strong>Calculation error</strong>
+          <span>{error}</span>
+          <button className="btn btn-small" onClick={() => window.location.assign("/calculator/load-solar")}>
+            <RefreshCcw size={16} /> Return to Step 1
+          </button>
         </div>
       )}
 
-      {result && <>
-        <section className="metrics-grid">
-          <Metric icon={<BatteryCharging size={23}/>} tone="green" label={<>Recommended<br/>Battery Size</>} value={`${result.recommendedBatterySize} kWh`} />
-          <Metric icon={<BarChart3 size={23}/>} tone="purple" label={<>Annual Bill<br/>Reduction</>} value={`$${result.annualBillReduction.toLocaleString()}`} badge={`${result.annualReductionPercent}%`} />
-          <Metric icon={<CircleDollarSign size={23}/>} tone="gold" label="Payback Period" value={`${result.paybackPeriod}`} badge="years" />
-          <Metric icon={<Coins size={23}/>} tone="purple" label={<>Net Present Value<br/>({draft.projectLifetime ?? 15} yr)</>} value={`${result.netPresentValue < 0 ? "−" : ""}$${Math.abs(result.netPresentValue).toLocaleString()}`} />
-        </section>
-
-        <section className="charts-grid">
-          <BillComparisonChart withoutBattery={result.withoutBatteryBill} withBattery={result.withBatteryBill}/>
-          <SavingsLineChart points={result.savingsCurve}/>
-        </section>
-
-        <section className="result-details-grid">
-          <div className="result-detail-card"><span>Load source</span><strong>{sourceLabel}</strong></div>
-          <div className="result-detail-card"><span>Estimated annual load</span><strong>{result.annualLoadKWh.toLocaleString()} kWh</strong></div>
-          <div className="result-detail-card"><span>Estimated solar generation</span><strong>{result.annualSolarGenerationKWh.toLocaleString()} kWh</strong></div>
-          <div className="result-detail-card"><span>Estimated annual export</span><strong>{result.estimatedAnnualExportKWh.toLocaleString()} kWh</strong></div>
-          <div className="result-detail-card"><span>Self-consumption</span><strong>{result.selfConsumptionBeforePercent}% → {result.selfConsumptionAfterPercent}%</strong></div>
-          <div className="result-detail-card"><span>Grid import</span><strong>{result.annualGridImportBeforeKWh.toLocaleString()} → {result.annualGridImportAfterKWh.toLocaleString()} kWh/yr</strong></div>
-        </section>
-
-        <div className="notice"><strong>{result.meta.model}:</strong> {result.meta.message}<br/><span>{apiStatus}</span></div>
-        {savedName && <div className="success-box">“{savedName}” was saved successfully. <button onClick={() => window.location.assign("/saved-scenarios")}>Open Saved Scenarios</button></div>}
-
-        <div className="button-row">
-          <button className="btn" onClick={() => window.location.assign("/calculator/battery-costs")}><ArrowLeft size={18}/> Back</button>
-          <div className="right-actions"><button className="btn" onClick={() => { setScenarioName(savedName || "My New Scenario"); setSaveError(""); setSaveOpen(true); }}><Bookmark size={18}/> Save Scenario</button><button className="btn btn-primary btn-lg" onClick={startNew}>New Calculation <ArrowRight size={18}/></button></div>
-        </div>
-      </>}
-
-      {saveOpen && result && (
-        <div className="modal-backdrop" role="presentation" onMouseDown={() => !saving && setSaveOpen(false)}>
-          <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="save-title" onMouseDown={(e) => e.stopPropagation()}>
-            <div className="modal-header"><div><h2 id="save-title">Save Scenario</h2><p>Store this dummy calculation in your browser so you can view it later.</p></div><button className="icon-button" onClick={() => setSaveOpen(false)} aria-label="Close"><X size={20}/></button></div>
-            {saveError && <div className="error-box" role="alert">{saveError}</div>}
-            <div className="field"><label htmlFor="scenario-name">Scenario name</label><input id="scenario-name" className="input" value={scenarioName} onChange={(e) => { setScenarioName(e.target.value); setSaveError(""); }} autoFocus maxLength={80}/><div className="field-help">Required · maximum 80 characters.</div></div>
-            <div className="modal-summary"><span>{result.recommendedBatterySize} kWh battery</span><span>${result.annualBillReduction.toLocaleString()} annual savings</span></div>
-            <div className="modal-actions"><button className="btn" disabled={saving} onClick={() => setSaveOpen(false)}>Cancel</button><button className="btn btn-primary" disabled={saving || !scenarioName.trim()} onClick={handleSaveScenario}>{saving ? <><span className="spinner"/> Saving...</> : <><Save size={18}/> Save Scenario</>}</button></div>
+      {data && result && (
+        <>
+          <div className={`retention-result-banner ${data.retained ? "retained" : "transient"}`}>
+            <ShieldCheck size={19} />
+            <div>
+              <strong>{data.retained ? "Saved calculation" : "Private transient calculation"}</strong>
+              <span>
+                {data.retained
+                  ? "The input and result artifacts were retained by the backend for later access."
+                  : "The backend processed this request without creating a calculation record or storing the uploaded file/results."}
+              </span>
+            </div>
           </div>
-        </div>
+
+          <section className="metrics-grid">
+            <Metric icon={<BatteryCharging size={23} />} tone="green" label="Recommended Battery" value={`${result.optimal_battery_size_kwh.toFixed(2)} kWh`} />
+            <Metric icon={<BarChart3 size={23} />} tone="purple" label="Annual Bill Reduction" value={`$${result.estimated_annual_bill_reduction_aud.toFixed(2)}`} badge={`${result.estimated_annual_bill_reduction_percent.toFixed(1)}%`} />
+            <Metric icon={<CircleDollarSign size={23} />} tone="gold" label="Simple Payback" value={result.simple_payback_years === null ? "N/A" : `${result.simple_payback_years.toFixed(1)} yr`} />
+            <Metric icon={<Gauge size={23} />} tone="purple" label="Net Annual Payment" value={`$${result.net_annual_payment_aud.toFixed(2)}`} />
+          </section>
+
+          <section className="charts-grid single-chart">
+            <BillComparisonChart withoutBattery={result.baseline_annual_payment_aud} withBattery={result.net_annual_payment_aud} />
+            <div className="card result-summary-panel">
+              <div className="card-header"><h2>Energy Summary</h2></div>
+              <div className="result-summary-list">
+                <Summary label="Annual load" value={`${result.annual_load_kwh.toLocaleString()} kWh`} />
+                <Summary label="Annual PV generation" value={`${result.annual_pv_generation_kwh.toLocaleString()} kWh`} />
+                <Summary label="Grid import" value={`${result.import_from_grid_kwh_year.toLocaleString()} kWh`} />
+                <Summary label="Grid export" value={`${result.export_to_grid_kwh_year.toLocaleString()} kWh`} />
+                <Summary label="Self-consumption" value={`${result.baseline_self_consumption_percent.toFixed(1)}% → ${result.self_consumption_percent.toFixed(1)}%`} />
+                <Summary label="Battery upfront cost" value={`$${result.battery_upfront_cost_aud.toLocaleString()}`} />
+              </div>
+            </div>
+          </section>
+
+          <section className="card page-card-space">
+            <div className="card-header">
+              <div>
+                <h2>{data.retained ? "Calculation Record" : "Calculation Details"}</h2>
+                <p className="admin-card-subtitle">
+                  {data.retained
+                    ? "Saved in the backend with its unique input and canonical CSV."
+                    : "Displayed from this transient response; no backend calculation record was created."}
+                </p>
+              </div>
+            </div>
+            <div className="result-details-grid">
+              <Detail label="Input file" value={data.input_filename || "—"} />
+              <Detail label="Location" value={location || "Not provided"} />
+              <Detail label="Retention" value={data.retained ? "Saved" : "Not saved"} />
+              <Detail label="Runtime" value={`${data.runtime_ms} ms`} />
+              <Detail label="Engine" value={data.algorithm_version || result.engine} />
+              <Detail label="PV size" value={`${result.pv_size_kw} kW`} />
+              <Detail label="Profile duration" value={`${result.profile_duration_hours.toLocaleString()} hours`} />
+            </div>
+            {data.warnings.length > 0 && <div className="notice"><strong>Warnings:</strong> {data.warnings.join(" ")}</div>}
+          </section>
+
+          <section className="card page-card-space">
+            <div className="card-header">
+              <div>
+                <h2>Downloads</h2>
+                <p className="admin-card-subtitle">
+                  {data.retained
+                    ? (token
+                        ? "Stored artifacts are protected by this guest calculation's private browser token."
+                        : "Stored artifacts are protected by your signed-in account session.")
+                    : "The canonical result CSV is returned inline for this transient calculation and is not stored by the backend."}
+                </p>
+              </div>
+            </div>
+            <div className="download-grid">
+              {data.retained && data.files.map((file) => (
+                <button
+                  className="download-card"
+                  key={file.id}
+                  disabled={downloading === file.id}
+                  onClick={() => downloadStored(file.id, file.filename)}
+                >
+                  <FileSpreadsheet size={22} />
+                  <span>
+                    <strong>{file.filename}</strong>
+                    <small>{file.kind === "legacy_csv" ? "Canonical result CSV" : "Original uploaded input"} · {(file.size_bytes / 1024).toFixed(1)} KB</small>
+                  </span>
+                  <Download size={18} />
+                </button>
+              ))}
+
+              {!data.retained && data.transient_csv && (
+                <button className="download-card" onClick={downloadTransient}>
+                  <FileSpreadsheet size={22} />
+                  <span>
+                    <strong>{data.transient_csv.filename}</strong>
+                    <small>Transient canonical result CSV · {(data.transient_csv.size_bytes / 1024).toFixed(1)} KB</small>
+                  </span>
+                  <Download size={18} />
+                </button>
+              )}
+            </div>
+          </section>
+
+          {!data.retained && (
+            <div className="notice privacy-notice">
+              <strong>Privacy note:</strong>&nbsp; This result will not appear in My Calculations because the backend did not retain it. Download the CSV before leaving if you need a copy.
+            </div>
+          )}
+
+          <div className="notice"><strong>Algorithm integrity:</strong> {result.algorithm_source} · SHA-256 {result.algorithm_sha256.slice(0, 16)}…</div>
+          <div className="button-row">
+            <button
+              className="btn"
+              onClick={() => window.location.assign(data.retained ? "/results-history" : "/calculator/load-solar")}
+            >
+              <ArrowLeft size={18} /> {data.retained ? "My Calculations" : "Back to Inputs"}
+            </button>
+            <button className="btn btn-primary btn-lg" onClick={startNew}>New Calculation <ArrowRight size={18} /></button>
+          </div>
+        </>
       )}
     </AppShell>
   );
 }
 
-function Metric({ icon, tone, label, value, badge }: { icon: React.ReactNode; tone: "green"|"purple"|"gold"; label: React.ReactNode; value: string; badge?: string }) {
+function Metric({ icon, tone, label, value, badge }: { icon: React.ReactNode; tone: "green" | "purple" | "gold"; label: string; value: string; badge?: string }) {
   return <div className="metric-card"><div className="metric-top"><div className={`metric-icon ${tone}`}>{icon}</div><div>{label}</div></div><div className="metric-value">{value}{badge && <span className="mini-pill">{badge}</span>}</div></div>;
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return <div className="result-detail-card"><span>{label}</span><strong>{value}</strong></div>;
+}
+
+function Summary({ label, value }: { label: string; value: string }) {
+  return <div className="summary-row"><span>{label}</span><strong>{value}</strong></div>;
 }
