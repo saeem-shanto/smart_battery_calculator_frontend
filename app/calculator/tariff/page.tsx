@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, LockKeyhole } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StepIndicator } from "@/components/StepIndicator";
 import { getDraft } from "@/lib/draft";
+import type { DraftCalculation } from "@/lib/types";
 
 const assumptions = [
   ["PV system size", "5.0 kW"],
@@ -16,15 +17,30 @@ const assumptions = [
 ];
 
 export default function TariffPage() {
+  const [draft, setDraft] = useState<DraftCalculation | null>(null);
+
   useEffect(() => {
-    const draft = getDraft();
-    if (!draft.inputFileName) window.location.replace("/calculator/load-solar");
+    const current = getDraft();
+    if (!current.inputFileName) {
+      window.location.replace("/calculator/load-solar");
+      return;
+    }
+    setDraft(current);
   }, []);
 
   return (
     <AppShell>
-      <div className="step-heading"><h1>New Calculation</h1><p>Step 2 of 4</p></div>
+      <div className="step-heading"><h1>New Calculation</h1><p>Step 2 of 4 · Review the fixed client-algorithm assumptions.</p></div>
       <StepIndicator current={2} />
+
+      {draft && (
+        <div className="workflow-context" role="status">
+          <div><span>Validated input</span><strong>{draft.inputFileName}</strong></div>
+          <div><span>Profile</span><strong>{draft.workbookValidation?.row_count ? `${draft.workbookValidation.row_count.toLocaleString()} rows` : "Validated annual data"}</strong></div>
+          <div><span>Retention</span><strong>{draft.retainData ? "Saved after calculation" : "Transient / not saved"}</strong></div>
+        </div>
+      )}
+
       <section className="section-card">
         <div className="locked-heading">
           <div>
@@ -37,10 +53,15 @@ export default function TariffPage() {
           {assumptions.map(([label, value]) => <div className="assumption-card" key={label}><span>{label}</span><strong>{value}</strong></div>)}
         </div>
       </section>
-      <div className="notice"><strong>Why locked?</strong>&nbsp; The project requirement is to preserve the client-provided MATLAB files unchanged. The frontend therefore shows the actual values used by the optimisation instead of presenting controls that would be ignored.</div>
+
+      <div className="notice locked-notice"><strong>Why locked?</strong>&nbsp; The project requirement is to preserve the client-provided MATLAB files unchanged. These are the actual values used by the optimisation, not disabled controls or placeholders.</div>
+
       <div className="button-row">
-        <button className="btn" onClick={() => window.location.assign("/calculator/load-solar")}><ArrowLeft size={18} /> Back</button>
-        <button className="btn btn-primary btn-lg" onClick={() => window.location.assign("/calculator/battery-costs")}>Next: Battery Cost <ArrowRight size={18} /></button>
+        <button className="btn" type="button" onClick={() => window.location.assign("/calculator/load-solar")}><ArrowLeft size={18} /> Back</button>
+        <div className="right-actions">
+          <span className="button-context">No changes are required on this step.</span>
+          <button className="btn btn-primary btn-lg" type="button" onClick={() => window.location.assign("/calculator/battery-costs")}>Next: Battery Cost <ArrowRight size={18} /></button>
+        </div>
       </div>
     </AppShell>
   );

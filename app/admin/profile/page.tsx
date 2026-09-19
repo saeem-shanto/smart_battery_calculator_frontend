@@ -1,9 +1,10 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
-import { Camera, KeyRound, Save, Trash2, UserRound } from "lucide-react";
+import { Camera, Eye, EyeOff, KeyRound, Save, Trash2, UserRound } from "lucide-react";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { ProtectedAvatar } from "@/components/ProtectedAvatar";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   changeAdminPassword,
   getAdminProfile,
@@ -46,14 +47,17 @@ function focusById(id: string) {
 export default function AdminProfilePage() {
   const [user, setUser] = useState<UserSummary | null>(null);
   const [form, setForm] = useState({ username: "", email: "", first_name: "", last_name: "" });
+  const [savedForm, setSavedForm] = useState({ username: "", email: "", first_name: "", last_name: "" });
   const [profileErrors, setProfileErrors] = useState<ProfileErrors>({});
   const [passwordErrors, setPasswordErrors] = useState<PasswordErrors>({});
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [working, setWorking] = useState(false);
+  const [confirmAvatarRemoval, setConfirmAvatarRemoval] = useState(false);
   const [avatarVersion, setAvatarVersion] = useState(Date.now());
   const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
   const [passwordWorking, setPasswordWorking] = useState(false);
+  const [showPasswords, setShowPasswords] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -66,7 +70,9 @@ export default function AdminProfilePage() {
 
   function apply(next: UserSummary) {
     setUser(next);
-    setForm({ username: next.username, email: next.email || "", first_name: next.first_name || "", last_name: next.last_name || "" });
+    const values = { username: next.username, email: next.email || "", first_name: next.first_name || "", last_name: next.last_name || "" };
+    setForm(values);
+    setSavedForm(values);
   }
 
   function updateProfileField(field: ProfileField, value: string) {
@@ -135,6 +141,7 @@ export default function AdminProfilePage() {
   }
 
   async function removeAvatar() {
+    setConfirmAvatarRemoval(false);
     setWorking(true); setError(""); setMessage("");
     try {
       const next = await removeAdminAvatar(); apply(next); setAvatarVersion(Date.now()); setMessage("Profile picture removed.");
@@ -186,20 +193,24 @@ export default function AdminProfilePage() {
 
   const pError = (field: ProfileField) => profileErrors[field];
   const pwError = (field: PasswordField) => passwordErrors[field];
+  const profileChanged = JSON.stringify(form) !== JSON.stringify(savedForm);
+  const nextPasswordLongEnough = passwords.next.length >= 8;
+  const nextPasswordNotNumeric = Boolean(passwords.next) && !/^\d+$/.test(passwords.next);
+  const nextPasswordsMatch = Boolean(passwords.confirm) && passwords.next === passwords.confirm;
 
   return <AdminShell onLogout={logout} active="profile">
     <div className="page-header"><h1>Admin Profile</h1><p>Manage the staff account identity used by the administration portal.</p></div>
-    {error && <div className="error-box admin-message">{error}</div>}
-    {message && <div className="success-box admin-message">{message}</div>}
+    {error && <div className="error-box admin-message" role="alert"><strong>Admin profile error</strong><span>{error}</span></div>}
+    {message && <div className="success-box admin-message" role="status">{message}</div>}
     {!user ? <div className="loading-inline"><span className="spinner-dark"/> Loading profile…</div> : <>
       <section className="card page-card-space profile-card">
         <div className="profile-avatar-panel">
           <div className="profile-avatar-large"><ProtectedAvatar role="admin" enabled={Boolean(user.avatar_download_path)} version={avatarVersion} alt="Admin profile" fallback={<UserRound size={42}/>} /></div>
-          <div><h2>{user.name}</h2><p>@{user.username} · Administrator</p></div>
+          <div><h2>{user.name}</h2><p>@{user.username} · Administrator</p><span className="field-help">JPEG, PNG or WebP · up to {MAX_AVATAR_MB} MB</span></div>
           <div className="profile-avatar-actions">
             <input ref={fileRef} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={avatar}/>
             <button className="btn" type="button" onClick={() => fileRef.current?.click()} disabled={working}><Camera size={17}/> Change Picture</button>
-            {user.avatar_download_path && <button className="btn btn-danger" type="button" onClick={removeAvatar} disabled={working}><Trash2 size={17}/> Remove</button>}
+            {user.avatar_download_path && <button className="btn btn-danger" type="button" onClick={()=>setConfirmAvatarRemoval(true)} disabled={working}><Trash2 size={17}/> Remove</button>}
           </div>
         </div>
         <form className="account-form profile-form" onSubmit={save} noValidate>
@@ -209,20 +220,29 @@ export default function AdminProfilePage() {
             <div className={`field${pError("username") ? " has-error" : ""}`}><label htmlFor="admin-profile-username">Username</label><input id="admin-profile-username" className={`input${pError("username") ? " input-error" : ""}`} value={form.username} onChange={e => updateProfileField("username",e.target.value)} aria-invalid={Boolean(pError("username"))}/>{pError("username") && <div className="field-message error">{pError("username")}</div>}</div>
             <div className={`field${pError("email") ? " has-error" : ""}`}><label htmlFor="admin-profile-email">Email</label><input id="admin-profile-email" className={`input${pError("email") ? " input-error" : ""}`} type="email" value={form.email} onChange={e => updateProfileField("email",e.target.value)} aria-invalid={Boolean(pError("email"))}/>{pError("email") && <div className="field-message error">{pError("email")}</div>}</div>
           </div>
-          <div className="profile-form-actions"><button className="btn btn-primary" disabled={working}><Save size={17}/> {working ? "Saving…" : "Save Profile"}</button></div>
+          <div className="profile-form-actions"><span className="profile-save-state">{profileChanged ? "Unsaved changes" : "Profile is up to date"}</span><button className="btn btn-primary" disabled={working || !profileChanged}><Save size={17}/> {working ? "Saving…" : "Save Profile"}</button></div>
         </form>
       </section>
       <section className="card page-card-space profile-card">
         <div className="card-header"><div><h2>Change Password</h2><p className="admin-card-subtitle">Changing your password revokes existing backend refresh tokens.</p></div><KeyRound size={22}/></div>
         <form className="account-form profile-form" onSubmit={change} noValidate>
           <div className="form-grid">
-            <div className={`field${pwError("current") ? " has-error" : ""}`}><label htmlFor="admin-password-current">Current password</label><input id="admin-password-current" className={`input${pwError("current") ? " input-error" : ""}`} type="password" value={passwords.current} onChange={e=>updatePasswordField("current",e.target.value)} required aria-invalid={Boolean(pwError("current"))}/>{pwError("current") && <div className="field-message error">{pwError("current")}</div>}</div>
-            <div className={`field${pwError("next") ? " has-error" : ""}`}><label htmlFor="admin-password-next">New password</label><input id="admin-password-next" className={`input${pwError("next") ? " input-error" : ""}`} type="password" value={passwords.next} onChange={e=>updatePasswordField("next",e.target.value)} required aria-invalid={Boolean(pwError("next"))}/>{pwError("next") && <div className="field-message error">{pwError("next")}</div>}</div>
-            <div className={`field${pwError("confirm") ? " has-error" : ""}`}><label htmlFor="admin-password-confirm">Confirm new password</label><input id="admin-password-confirm" className={`input${pwError("confirm") ? " input-error" : ""}`} type="password" value={passwords.confirm} onChange={e=>updatePasswordField("confirm",e.target.value)} required aria-invalid={Boolean(pwError("confirm"))}/>{pwError("confirm") && <div className="field-message error">{pwError("confirm")}</div>}</div>
+            <div className={`field${pwError("current") ? " has-error" : ""}`}><label htmlFor="admin-password-current">Current password</label><div className="login-input-wrap no-leading-icon"><input id="admin-password-current" className={`input${pwError("current") ? " input-error" : ""}`} type={showPasswords?"text":"password"} autoComplete="current-password" value={passwords.current} onChange={e=>updatePasswordField("current",e.target.value)} required aria-invalid={Boolean(pwError("current"))}/><button className="password-toggle" type="button" onClick={()=>setShowPasswords(v=>!v)} aria-label={showPasswords?"Hide passwords":"Show passwords"}>{showPasswords?<EyeOff size={18}/>:<Eye size={18}/>}</button></div>{pwError("current") && <div className="field-message error">{pwError("current")}</div>}</div>
+            <div className={`field${pwError("next") ? " has-error" : ""}`}><label htmlFor="admin-password-next">New password</label><input id="admin-password-next" className={`input${pwError("next") ? " input-error" : ""}`} type={showPasswords?"text":"password"} autoComplete="new-password" value={passwords.next} onChange={e=>updatePasswordField("next",e.target.value)} required aria-invalid={Boolean(pwError("next"))}/><div className="password-guidance"><span className={nextPasswordLongEnough?"met":""}>8+ characters</span><span className={nextPasswordNotNumeric?"met":""}>Not entirely numeric</span><span>Avoid common passwords</span></div>{pwError("next") && <div className="field-message error">{pwError("next")}</div>}</div>
+            <div className={`field${pwError("confirm") ? " has-error" : ""}`}><label htmlFor="admin-password-confirm">Confirm new password</label><input id="admin-password-confirm" className={`input${pwError("confirm") ? " input-error" : ""}`} type={showPasswords?"text":"password"} autoComplete="new-password" value={passwords.confirm} onChange={e=>updatePasswordField("confirm",e.target.value)} required aria-invalid={Boolean(pwError("confirm"))}/><div className={`field-help ${nextPasswordsMatch?"field-help-success":""}`}>{passwords.confirm ? (nextPasswordsMatch ? "Passwords match." : "Must match the new password.") : "Enter the new password again."}</div>{pwError("confirm") && <div className="field-message error">{pwError("confirm")}</div>}</div>
           </div>
           <div className="profile-form-actions"><button className="btn btn-outline-green" type="submit" disabled={passwordWorking}><KeyRound size={17}/> {passwordWorking ? "Changing…" : "Change Password"}</button></div>
         </form>
       </section>
     </>}
+    <ConfirmDialog
+      open={confirmAvatarRemoval}
+      title="Remove admin profile picture?"
+      message="The current profile picture will be deleted from this staff account. A new picture can be uploaded later."
+      confirmLabel="Remove Picture"
+      busy={working}
+      onCancel={()=>setConfirmAvatarRemoval(false)}
+      onConfirm={()=>void removeAvatar()}
+    />
   </AdminShell>;
 }

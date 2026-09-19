@@ -1,4 +1,4 @@
-# Smart Battery Calculator Frontend — v1.5.6 Production
+# Smart Battery Calculator Frontend — v1.5.7 Production
 
 Production Next.js frontend for Project N01. The visual theme, layout and existing icon language are preserved from the approved prototype.
 
@@ -30,6 +30,10 @@ There is no `app/api/*` application proxy layer in this build.
 - Debug overlay for development only
 - Smart Battery Calculator browser title icon
 
+## v1.5.7 UI/UX refinement
+
+The approved visual theme/layout/icons are unchanged. This release improves calculator guidance and validation, account/profile forms, retained/transient result states, history/search/confirmation flows, tariff filtering, admin management states, accessibility, mobile behavior, and debug feedback. See `FRONTEND_UI_UX_REVIEW_v1.5.7.md`.
+
 ## Authentication
 
 Django issues SimpleJWT access/refresh tokens. Because this frontend calls Django directly, the tokens are stored in **`sessionStorage` for the current browser tab** and sent only in `Authorization: Bearer ...` headers. They are not placed in URLs or long-lived `localStorage`.
@@ -45,7 +49,7 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000/api/v1
 NEXT_PUBLIC_MAX_UPLOAD_MB=15
 NEXT_PUBLIC_APP_DEBUG=true
 APP_DEBUG_BUILD=true
-NEXT_PUBLIC_APP_VERSION=1.5.6
+NEXT_PUBLIC_APP_VERSION=1.5.7
 ```
 
 Then:
@@ -72,7 +76,7 @@ NEXT_PUBLIC_API_BASE_URL=https://smart-battery-calculator-backend-2.onrender.com
 NEXT_PUBLIC_MAX_UPLOAD_MB=15
 NEXT_PUBLIC_APP_DEBUG=false
 APP_DEBUG_BUILD=false
-NEXT_PUBLIC_APP_VERSION=1.5.6
+NEXT_PUBLIC_APP_VERSION=1.5.7
 ```
 
 On the Django/Render service, allow the exact deployed frontend origin:

@@ -14,8 +14,8 @@ function focusField(field: LoginField) {
   window.requestAnimationFrame(() => {
     const element = document.getElementById(id) as HTMLInputElement | null;
     if (!element) return;
-    element.focus({ preventScroll: true });
     element.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => element.focus({ preventScroll: true }), 220);
   });
 }
 
@@ -46,6 +46,7 @@ export default function UserLoginPage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (working) return;
     setError("");
     const next: LoginErrors = {};
     if (!username.trim()) next.username = "Enter your username.";
@@ -74,7 +75,7 @@ export default function UserLoginPage() {
           setFieldErrors(cleaned);
           focusField(cleaned.username ? "username" : "password");
         } else {
-          setError("The username or password is incorrect. Please try again.");
+          setError(caught.status === 401 ? "The username or password is incorrect. Please try again." : caught.message);
         }
       } else {
         setError(caught instanceof Error ? caught.message : "Sign in failed. Please try again.");
@@ -90,23 +91,24 @@ export default function UserLoginPage() {
       <section className="account-form-card">
         <div className="account-form-icon"><LogIn size={28}/></div>
         <h2>Welcome back</h2>
-        <p className="account-form-intro">Guest calculations still work without signing in. Sign in when you want retained calculations linked to your account.</p>
+        <p className="account-form-intro">Guest calculations still work without signing in. Sign in when you want retained calculations linked to your account across browser sessions.</p>
         {notice && <div className="success-box" role="status">{notice}</div>}
         {error && <div className="error-box" role="alert"><strong>Could not sign in</strong><span>{error}</span></div>}
         <form onSubmit={submit} className="account-form" noValidate>
           <div className={`field${fieldErrors.username ? " has-error" : ""}`}>
-            <label htmlFor="user-login-username">Username</label>
-            <div className="login-input-wrap"><UserRound size={18}/><input id="user-login-username" className={`input${fieldErrors.username ? " input-error" : ""}`} autoComplete="username" value={username} onChange={(e)=>{setUsername(e.target.value); clearField("username");}} disabled={working} aria-invalid={Boolean(fieldErrors.username)} aria-describedby={fieldErrors.username ? "user-login-username-error" : undefined}/></div>
+            <label htmlFor="user-login-username">Username <span className="required-label">Required</span></label>
+            <div className="login-input-wrap"><UserRound size={18}/><input id="user-login-username" className={`input${fieldErrors.username ? " input-error" : ""}`} autoComplete="username" value={username} onChange={(e) => { setUsername(e.target.value); clearField("username"); }} disabled={working} autoFocus aria-invalid={Boolean(fieldErrors.username)} aria-describedby={fieldErrors.username ? "user-login-username-error" : undefined}/></div>
             {fieldErrors.username && <div id="user-login-username-error" className="field-message error" role="alert">{fieldErrors.username}</div>}
           </div>
           <div className={`field${fieldErrors.password ? " has-error" : ""}`}>
-            <label htmlFor="user-login-password">Password</label>
-            <div className="login-input-wrap"><LockKeyhole size={18}/><input id="user-login-password" className={`input${fieldErrors.password ? " input-error" : ""}`} type={showPassword?"text":"password"} autoComplete="current-password" value={password} onChange={(e)=>{setPassword(e.target.value); clearField("password");}} disabled={working} aria-invalid={Boolean(fieldErrors.password)} aria-describedby={fieldErrors.password ? "user-login-password-error" : undefined}/><button className="password-toggle" type="button" onClick={()=>setShowPassword((v)=>!v)} aria-label={showPassword?"Hide password":"Show password"}>{showPassword?<EyeOff size={18}/>:<Eye size={18}/>}</button></div>
+            <label htmlFor="user-login-password">Password <span className="required-label">Required</span></label>
+            <div className="login-input-wrap"><LockKeyhole size={18}/><input id="user-login-password" className={`input${fieldErrors.password ? " input-error" : ""}`} type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={(e) => { setPassword(e.target.value); clearField("password"); }} disabled={working} aria-invalid={Boolean(fieldErrors.password)} aria-describedby={fieldErrors.password ? "user-login-password-error" : undefined}/><button className="password-toggle" type="button" onClick={() => setShowPassword((v) => !v)} aria-label={showPassword ? "Hide password" : "Show password"} disabled={working}>{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div>
             {fieldErrors.password && <div id="user-login-password-error" className="field-message error" role="alert">{fieldErrors.password}</div>}
           </div>
-          <button className="btn btn-primary btn-lg account-form-submit" type="submit" disabled={working}>{working?"Signing in…":"Sign In"}</button>
+          <button className="btn btn-primary btn-lg account-form-submit" type="submit" disabled={working}>{working ? "Signing in…" : "Sign In"}</button>
+          <div className="form-security-note">For this production frontend, the account session is kept only in the current browser tab and sent directly to Django with authenticated API requests.</div>
         </form>
-        <div className="account-form-footer">No account yet? <a href="/account/register">Create one</a></div>
+        <div className="account-form-footer">No account yet? <a href="/account/register">Create one</a> · <a href="/dashboard">Continue as guest</a></div>
       </section>
     </AppShell>
   );

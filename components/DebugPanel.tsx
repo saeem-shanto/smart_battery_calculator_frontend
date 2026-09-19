@@ -56,6 +56,8 @@ export function DebugPanel() {
       <button
         className="debug-panel-toggle"
         type="button"
+        aria-expanded={open}
+        aria-controls="debug-panel-body"
         onClick={() => {
           const next = !open;
           setOpen(next);
@@ -64,7 +66,7 @@ export function DebugPanel() {
       >
         <Bug size={16}/><span>DEBUG</span>{open?<ChevronDown size={15}/>:<ChevronUp size={15}/>}
       </button>
-      {open && <div className="debug-panel-body">
+      {open && <div id="debug-panel-body" className="debug-panel-body">
         <div><span>Version</span><strong>{process.env.NEXT_PUBLIC_APP_VERSION || "dev"}</strong></div>
         <div><span>Mode</span><strong>{process.env.NODE_ENV}</strong></div>
         <div><span>Route</span><strong>{pathname}</strong></div>

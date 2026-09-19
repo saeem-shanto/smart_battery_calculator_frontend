@@ -15,8 +15,8 @@ function focusAdminField(field: AdminField) {
   window.requestAnimationFrame(() => {
     const element = document.getElementById(id) as HTMLInputElement | null;
     if (!element) return;
-    element.focus({ preventScroll: true });
     element.scrollIntoView({ behavior: "smooth", block: "center" });
+    window.setTimeout(() => element.focus({ preventScroll: true }), 220);
   });
 }
 
@@ -48,13 +48,14 @@ export default function AdminLoginPage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (working) return;
     setError("");
     const cleanUsername = username.trim();
     const next: AdminErrors = {};
     if (!cleanUsername) next.username = "Enter the admin username.";
-    else if (cleanUsername.length > 50) next.username = "Username is too long.";
+    else if (cleanUsername.length > 150) next.username = "Username is too long.";
     if (!password) next.password = "Enter the admin password.";
-    else if (password.length > 100) next.password = "Password is too long.";
+    else if (password.length > 200) next.password = "Password is too long.";
     if (Object.keys(next).length) {
       setFieldErrors(next);
       focusAdminField(next.username ? "username" : "password");
@@ -77,7 +78,7 @@ export default function AdminLoginPage() {
           setFieldErrors(cleaned);
           focusAdminField(cleaned.username ? "username" : "password");
         } else {
-          setError("The admin username or password is incorrect.");
+          setError(caught.status === 401 ? "The admin username or password is incorrect." : caught.message);
         }
       } else {
         setError(caught instanceof Error ? caught.message : "Admin login failed. Please try again.");
@@ -93,23 +94,23 @@ export default function AdminLoginPage() {
         <BrandLogo />
         <div className="admin-login-icon"><ShieldCheck size={30} /></div>
         <h1>Admin Login</h1>
-        <p>Sign in with your Django staff account to manage calculation records and stored files.</p>
+        <p>Sign in with a Django staff account to manage calculation records and stored files.</p>
         {notice && <div className="success-box" role="status">{notice}</div>}
         {error && <div className="error-box" role="alert"><strong>Could not sign in</strong><span>{error}</span></div>}
         <form onSubmit={submit} noValidate className="admin-login-form">
           <div className={`field${fieldErrors.username ? " has-error" : ""}`}>
-            <label htmlFor="admin-username">Username</label>
-            <div className="login-input-wrap"><UserRound size={18} /><input id="admin-username" className={`input${fieldErrors.username ? " input-error" : ""}`} value={username} onChange={(e) => {setUsername(e.target.value); clearField("username");}} autoComplete="username" placeholder="Admin username" disabled={working} aria-invalid={Boolean(fieldErrors.username)} aria-describedby={fieldErrors.username ? "admin-username-error" : undefined}/></div>
+            <label htmlFor="admin-username">Username <span className="required-label">Required</span></label>
+            <div className="login-input-wrap"><UserRound size={18} /><input id="admin-username" className={`input${fieldErrors.username ? " input-error" : ""}`} value={username} onChange={(e) => { setUsername(e.target.value); clearField("username"); }} autoComplete="username" placeholder="Admin username" disabled={working} autoFocus aria-invalid={Boolean(fieldErrors.username)} aria-describedby={fieldErrors.username ? "admin-username-error" : undefined}/></div>
             {fieldErrors.username && <div id="admin-username-error" className="field-message error" role="alert">{fieldErrors.username}</div>}
           </div>
           <div className={`field${fieldErrors.password ? " has-error" : ""}`}>
-            <label htmlFor="admin-password">Password</label>
-            <div className="login-input-wrap"><LockKeyhole size={18} /><input id="admin-password" className={`input${fieldErrors.password ? " input-error" : ""}`} type={showPassword ? "text" : "password"} value={password} onChange={(e) => {setPassword(e.target.value); clearField("password");}} autoComplete="current-password" placeholder="Password" disabled={working} aria-invalid={Boolean(fieldErrors.password)} aria-describedby={fieldErrors.password ? "admin-password-error" : undefined}/><button type="button" className="password-toggle" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div>
+            <label htmlFor="admin-password">Password <span className="required-label">Required</span></label>
+            <div className="login-input-wrap"><LockKeyhole size={18} /><input id="admin-password" className={`input${fieldErrors.password ? " input-error" : ""}`} type={showPassword ? "text" : "password"} value={password} onChange={(e) => { setPassword(e.target.value); clearField("password"); }} autoComplete="current-password" placeholder="Password" disabled={working} aria-invalid={Boolean(fieldErrors.password)} aria-describedby={fieldErrors.password ? "admin-password-error" : undefined}/><button type="button" className="password-toggle" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? "Hide password" : "Show password"} disabled={working}>{showPassword ? <EyeOff size={18}/> : <Eye size={18}/>}</button></div>
             {fieldErrors.password && <div id="admin-password-error" className="field-message error" role="alert">{fieldErrors.password}</div>}
           </div>
-          <button className="btn btn-primary btn-lg admin-login-button" type="submit" disabled={working}>{working ? "Signing in..." : "Sign In"}</button>
+          <button className="btn btn-primary btn-lg admin-login-button" type="submit" disabled={working}>{working ? "Signing in…" : "Sign In"}</button>
         </form>
-        <div className="admin-security-note"><LockKeyhole size={16}/><span>Credentials are verified directly by the Django backend. JWTs are kept for the current browser tab and sent only to Django in Authorization headers.</span></div>
+        <div className="admin-security-note"><LockKeyhole size={16}/><span>Credentials are verified directly by Django. The admin session is kept only in the current browser tab and sent to the backend in Authorization headers.</span></div>
         <a className="admin-back-link" href="/dashboard">← Back to user dashboard</a>
       </section>
     </main>

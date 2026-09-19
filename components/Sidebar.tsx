@@ -30,5 +30,5 @@ export function Sidebar() {
     window.location.assign(href);
   }
 
-  return <aside className="sidebar"><BrandLogo/><div className="sidebar-divider"/><nav className="sidebar-nav" aria-label="Main navigation">{items.map(({label,href,icon:Icon})=><a href={href} className={`nav-item ${active(href)?"active":""}`} key={label} onClick={(event)=>void navigate(event,href)}><Icon size={21} strokeWidth={1.8}/><span>{label}</span></a>)}</nav><UserAccountWidget/><div className="sidebar-tip"><Leaf size={20}/><span>Research decision-support tool using the client’s validated battery optimisation model.</span></div></aside>;
+  return <aside className="sidebar"><BrandLogo/><div className="sidebar-divider"/><nav className="sidebar-nav" aria-label="Main navigation">{items.map(({label,href,icon:Icon})=><a href={href} className={`nav-item ${active(href)?"active":""}`} key={label} aria-current={active(href) ? "page" : undefined} onClick={(event)=>void navigate(event,href)}><Icon size={21} strokeWidth={1.8}/><span>{label}</span></a>)}</nav><UserAccountWidget/><div className="sidebar-tip"><Leaf size={20}/><span>Research decision-support tool using the client’s validated battery optimisation model.</span></div></aside>;
 }

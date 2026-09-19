@@ -1,9 +1,10 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
-import { Camera, CheckCircle2, KeyRound, LogOut, Save, Trash2, UserRound } from "lucide-react";
+import { Camera, CheckCircle2, Eye, EyeOff, KeyRound, LogOut, Save, Trash2, UserRound } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { ProtectedAvatar } from "@/components/ProtectedAvatar";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import {
   changePassword,
   getCurrentUser,
@@ -46,16 +47,19 @@ export default function ProfilePage() {
   const [user, setUser] = useState<UserSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState({ username: "", email: "", first_name: "", last_name: "" });
+  const [savedProfile, setSavedProfile] = useState({ username: "", email: "", first_name: "", last_name: "" });
   const [profileFieldErrors, setProfileFieldErrors] = useState<ProfileErrors>({});
   const [profileError, setProfileError] = useState("");
   const [profileSuccess, setProfileSuccess] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [avatarVersion, setAvatarVersion] = useState(Date.now());
   const [avatarWorking, setAvatarWorking] = useState(false);
+  const [confirmAvatarRemoval, setConfirmAvatarRemoval] = useState(false);
   const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
   const [passwordFieldErrors, setPasswordFieldErrors] = useState<PasswordErrors>({});
   const [passwordError, setPasswordError] = useState("");
   const [passwordWorking, setPasswordWorking] = useState(false);
+  const [showPasswords, setShowPasswords] = useState(false);
   const avatarInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -71,7 +75,9 @@ export default function ProfilePage() {
 
   function applyUser(current: UserSummary) {
     setUser(current);
-    setProfile({ username: current.username, email: current.email || "", first_name: current.first_name || "", last_name: current.last_name || "" });
+    const next = { username: current.username, email: current.email || "", first_name: current.first_name || "", last_name: current.last_name || "" };
+    setProfile(next);
+    setSavedProfile(next);
   }
 
   function updateProfileField(field: ProfileField, value: string) {
@@ -158,6 +164,7 @@ export default function ProfilePage() {
   }
 
   async function deleteAvatar() {
+    setConfirmAvatarRemoval(false);
     setAvatarWorking(true); setProfileError(""); setProfileSuccess("");
     try {
       const current = await removeAvatar();
@@ -218,6 +225,10 @@ export default function ProfilePage() {
 
   const pError = (field: ProfileField) => profileFieldErrors[field];
   const pwError = (field: PasswordField) => passwordFieldErrors[field];
+  const profileChanged = JSON.stringify(profile) !== JSON.stringify(savedProfile);
+  const nextPasswordLongEnough = passwords.next.length >= 8;
+  const nextPasswordNotNumeric = Boolean(passwords.next) && !/^\d+$/.test(passwords.next);
+  const nextPasswordsMatch = Boolean(passwords.confirm) && passwords.next === passwords.confirm;
 
   return (
     <AppShell>
@@ -231,14 +242,14 @@ export default function ProfilePage() {
           <div className="profile-avatar-large">
             <ProtectedAvatar role="user" enabled={Boolean(user.avatar_download_path)} version={avatarVersion} alt="Profile" fallback={<UserRound size={42}/>} />
           </div>
-          <div><h2>{user.name}</h2><p>@{user.username}{user.is_staff ? " · Staff account" : ""}</p></div>
+          <div><h2>{user.name}</h2><p>@{user.username}{user.is_staff ? " · Staff account" : ""}</p><span className="field-help">JPEG, PNG or WebP · up to {MAX_AVATAR_MB} MB</span></div>
           <div className="profile-avatar-actions">
             <input ref={avatarInput} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={avatarChanged}/>
             <button className="btn" type="button" disabled={avatarWorking} onClick={()=>avatarInput.current?.click()}><Camera size={17}/> {avatarWorking?"Working…":"Change Picture"}</button>
-            {user.avatar_download_path && <button className="btn btn-danger" type="button" disabled={avatarWorking} onClick={deleteAvatar}><Trash2 size={17}/> Remove</button>}
+            {user.avatar_download_path && <button className="btn btn-danger" type="button" disabled={avatarWorking} onClick={()=>setConfirmAvatarRemoval(true)}><Trash2 size={17}/> Remove</button>}
           </div>
         </div>
-        {(profileError || profileSuccess) && <div className={profileError?"error-box":"success-box"}>{profileError || <><CheckCircle2 size={16}/> {profileSuccess}</>}</div>}
+        {(profileError || profileSuccess) && <div className={profileError?"error-box":"success-box"} role={profileError?"alert":"status"}>{profileError || <><CheckCircle2 size={16}/> {profileSuccess}</>}</div>}
         <form className="account-form profile-form" onSubmit={saveProfile} noValidate>
           <div className="form-grid">
             <div className={`field${pError("first_name") ? " has-error" : ""}`}><label htmlFor="profile-first">First name</label><input id="profile-first" className={`input${pError("first_name") ? " input-error" : ""}`} value={profile.first_name} onChange={(e)=>updateProfileField("first_name",e.target.value)} aria-invalid={Boolean(pError("first_name"))}/>{pError("first_name") && <div className="field-message error">{pError("first_name")}</div>}</div>
@@ -246,7 +257,7 @@ export default function ProfilePage() {
             <div className={`field${pError("username") ? " has-error" : ""}`}><label htmlFor="profile-username">Username</label><input id="profile-username" className={`input${pError("username") ? " input-error" : ""}`} value={profile.username} onChange={(e)=>updateProfileField("username",e.target.value)} required aria-invalid={Boolean(pError("username"))}/>{pError("username") && <div className="field-message error">{pError("username")}</div>}</div>
             <div className={`field${pError("email") ? " has-error" : ""}`}><label htmlFor="profile-email">Email</label><input id="profile-email" className={`input${pError("email") ? " input-error" : ""}`} type="email" value={profile.email} onChange={(e)=>updateProfileField("email",e.target.value)} aria-invalid={Boolean(pError("email"))}/>{pError("email") && <div className="field-message error">{pError("email")}</div>}</div>
           </div>
-          <div className="profile-form-actions"><button className="btn btn-primary" type="submit" disabled={savingProfile}><Save size={17}/> {savingProfile?"Saving…":"Save Profile"}</button></div>
+          <div className="profile-form-actions"><span className="profile-save-state">{profileChanged ? "Unsaved changes" : "Profile is up to date"}</span><button className="btn btn-primary" type="submit" disabled={savingProfile || !profileChanged}><Save size={17}/> {savingProfile?"Saving…":"Save Profile"}</button></div>
         </form>
       </section>
 
@@ -255,13 +266,22 @@ export default function ProfilePage() {
         {passwordError && <div className="error-box profile-inner-alert">{passwordError}</div>}
         <form className="account-form profile-form" onSubmit={passwordSubmit} noValidate>
           <div className="form-grid">
-            <div className={`field${pwError("current") ? " has-error" : ""}`}><label htmlFor="password-current">Current password</label><input id="password-current" className={`input${pwError("current") ? " input-error" : ""}`} type="password" autoComplete="current-password" value={passwords.current} onChange={(e)=>updatePasswordField("current",e.target.value)} required aria-invalid={Boolean(pwError("current"))}/>{pwError("current") && <div className="field-message error">{pwError("current")}</div>}</div>
-            <div className={`field${pwError("next") ? " has-error" : ""}`}><label htmlFor="password-next">New password</label><input id="password-next" className={`input${pwError("next") ? " input-error" : ""}`} type="password" autoComplete="new-password" value={passwords.next} onChange={(e)=>updatePasswordField("next",e.target.value)} required aria-invalid={Boolean(pwError("next"))}/>{pwError("next") && <div className="field-message error">{pwError("next")}</div>}</div>
-            <div className={`field${pwError("confirm") ? " has-error" : ""}`}><label htmlFor="password-confirm">Confirm new password</label><input id="password-confirm" className={`input${pwError("confirm") ? " input-error" : ""}`} type="password" autoComplete="new-password" value={passwords.confirm} onChange={(e)=>updatePasswordField("confirm",e.target.value)} required aria-invalid={Boolean(pwError("confirm"))}/>{pwError("confirm") && <div className="field-message error">{pwError("confirm")}</div>}</div>
+            <div className={`field${pwError("current") ? " has-error" : ""}`}><label htmlFor="password-current">Current password</label><div className="login-input-wrap no-leading-icon"><input id="password-current" className={`input${pwError("current") ? " input-error" : ""}`} type={showPasswords?"text":"password"} autoComplete="current-password" value={passwords.current} onChange={(e)=>updatePasswordField("current",e.target.value)} required aria-invalid={Boolean(pwError("current"))}/><button className="password-toggle" type="button" onClick={()=>setShowPasswords(v=>!v)} aria-label={showPasswords?"Hide passwords":"Show passwords"}>{showPasswords?<EyeOff size={18}/>:<Eye size={18}/>}</button></div>{pwError("current") && <div className="field-message error">{pwError("current")}</div>}</div>
+            <div className={`field${pwError("next") ? " has-error" : ""}`}><label htmlFor="password-next">New password</label><input id="password-next" className={`input${pwError("next") ? " input-error" : ""}`} type={showPasswords?"text":"password"} autoComplete="new-password" value={passwords.next} onChange={(e)=>updatePasswordField("next",e.target.value)} required aria-invalid={Boolean(pwError("next"))}/><div className="password-guidance"><span className={nextPasswordLongEnough?"met":""}>8+ characters</span><span className={nextPasswordNotNumeric?"met":""}>Not entirely numeric</span><span>Avoid common passwords</span></div>{pwError("next") && <div className="field-message error">{pwError("next")}</div>}</div>
+            <div className={`field${pwError("confirm") ? " has-error" : ""}`}><label htmlFor="password-confirm">Confirm new password</label><input id="password-confirm" className={`input${pwError("confirm") ? " input-error" : ""}`} type={showPasswords?"text":"password"} autoComplete="new-password" value={passwords.confirm} onChange={(e)=>updatePasswordField("confirm",e.target.value)} required aria-invalid={Boolean(pwError("confirm"))}/><div className={`field-help ${nextPasswordsMatch?"field-help-success":""}`}>{passwords.confirm ? (nextPasswordsMatch ? "Passwords match." : "Must match the new password.") : "Enter the new password again."}</div>{pwError("confirm") && <div className="field-message error">{pwError("confirm")}</div>}</div>
           </div>
           <div className="profile-form-actions"><button className="btn btn-outline-green" type="submit" disabled={passwordWorking}><KeyRound size={17}/> {passwordWorking?"Changing…":"Change Password"}</button></div>
         </form>
       </section>
+      <ConfirmDialog
+        open={confirmAvatarRemoval}
+        title="Remove profile picture?"
+        message="Your current profile picture will be deleted from your account. You can upload another picture at any time."
+        confirmLabel="Remove Picture"
+        busy={avatarWorking}
+        onCancel={()=>setConfirmAvatarRemoval(false)}
+        onConfirm={()=>void deleteAvatar()}
+      />
     </AppShell>
   );
 }

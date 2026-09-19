@@ -27,15 +27,31 @@ import {
 } from "@/lib/api";
 import { getHistoryItem, removeHistoryItem, saveCalculationHistory } from "@/lib/calculation-history";
 import { isCompleteBatteryResult, type CalculationResponse } from "@/lib/types";
-import { clearCachedTransientResult, getCachedTransientResult, hasTransientAttempt, markTransientAttempt, saveCachedTransientResult, transientFingerprint } from "@/lib/transient-result-cache";
+import {
+  clearCachedTransientResult,
+  getCachedTransientResult,
+  hasTransientAttempt,
+  markTransientAttempt,
+  saveCachedTransientResult,
+  transientFingerprint,
+} from "@/lib/transient-result-cache";
+
+type CalculationErrorState = {
+  message: string;
+  status?: number;
+  code?: string;
+};
+
+const debugEnabled = process.env.NEXT_PUBLIC_APP_DEBUG === "true";
 
 export default function ResultsPage() {
   const [data, setData] = useState<CalculationResponse | null>(null);
   const [token, setToken] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<CalculationErrorState | null>(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState("");
   const [downloadError, setDownloadError] = useState("");
+  const [downloadSuccess, setDownloadSuccess] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const startedAttempt = useRef<number | null>(null);
@@ -44,9 +60,7 @@ export default function ResultsPage() {
     if (!loading) return;
     setElapsedSeconds(0);
     const startedAt = Date.now();
-    const timer = window.setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
-    }, 1000);
+    const timer = window.setInterval(() => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000)), 1000);
     return () => window.clearInterval(timer);
   }, [loading, attempt]);
 
@@ -61,14 +75,14 @@ export default function ResultsPage() {
   }, [loading]);
 
   useEffect(() => {
-    // React Strict Mode intentionally re-runs effects in development. Without
-    // this guard the annual Octave optimisation can be submitted twice.
     if (startedAttempt.current === attempt) return;
     startedAttempt.current = attempt;
 
     (async () => {
       try {
-        setError("");
+        setError(null);
+        setDownloadError("");
+        setDownloadSuccess("");
         const params = new URLSearchParams(window.location.search);
         const requested = params.get("id");
         if (requested) {
@@ -111,10 +125,6 @@ export default function ResultsPage() {
         if (response.retained) {
           const publicId = response.public_id;
           if (!publicId) throw new Error("The backend retained the calculation but did not return its calculation ID.");
-
-          // Guest retained calculations receive a private access token.
-          // Account-owned retained calculations intentionally do not: future
-          // access is authorized by the signed-in user's Django JWT session.
           const access = response.access_token || "";
           setToken(access);
           saveDraft({ publicId, accessToken: access || undefined });
@@ -126,7 +136,7 @@ export default function ResultsPage() {
           saveCachedTransientResult(fingerprint, response);
         }
       } catch (caught) {
-        setError(calculationErrorMessage(caught));
+        setError(calculationErrorState(caught));
       } finally {
         setLoading(false);
       }
@@ -137,23 +147,25 @@ export default function ResultsPage() {
     clearCachedTransientResult();
     setData(null);
     setToken("");
-    setError("");
+    setError(null);
+    setDownloadError("");
+    setDownloadSuccess("");
     setLoading(true);
     setAttempt((value) => value + 1);
   }
 
   const result = data?.status === "completed" && isCompleteBatteryResult(data.result) ? data.result : null;
-  const location = useMemo(
-    () => [data?.suburb, data?.state, data?.postcode].filter(Boolean).join(", "),
-    [data],
-  );
+  const location = useMemo(() => [data?.suburb, data?.state, data?.postcode].filter(Boolean).join(", "), [data]);
+  const draft = typeof window !== "undefined" ? getDraft() : {};
 
   async function downloadStored(fileId: string, name: string) {
     if (!data?.public_id) return;
     setDownloading(fileId);
     setDownloadError("");
+    setDownloadSuccess("");
     try {
       await downloadCalculationFile(data.public_id, fileId, token, name);
+      setDownloadSuccess(`${name} download started.`);
     } catch (caught) {
       setDownloadError(caught instanceof Error ? caught.message : "Download failed.");
     } finally {
@@ -163,12 +175,11 @@ export default function ResultsPage() {
 
   function downloadTransient() {
     if (!data?.transient_csv) return;
+    setDownloadError("");
+    setDownloadSuccess("");
     try {
-      downloadTransientCsv(
-        data.transient_csv.base64_data,
-        data.transient_csv.filename,
-        data.transient_csv.content_type,
-      );
+      downloadTransientCsv(data.transient_csv.base64_data, data.transient_csv.filename, data.transient_csv.content_type);
+      setDownloadSuccess(`${data.transient_csv.filename} download started.`);
     } catch {
       setDownloadError("The transient CSV could not be prepared for download.");
     }
@@ -184,21 +195,19 @@ export default function ResultsPage() {
   if (loading) {
     return (
       <AppShell>
-        <div className="step-heading"><h1>New Calculation</h1><p>Step 4 of 4</p></div>
+        <div className="step-heading"><h1>New Calculation</h1><p>Step 4 of 4 · Running the annual optimisation.</p></div>
         <StepIndicator current={4} />
-        <div className="calculation-loading">
-          <span className="spinner-dark" />
+        <div className="calculation-loading" role="status" aria-live="polite">
+          <span className="spinner-dark" aria-hidden="true" />
           <h2>Running the battery optimisation…</h2>
-          <p>The backend is processing the annual profile with GNU Octave. Please keep this page open and avoid refreshing.</p>
+          <p>The backend is processing the annual profile with GNU Octave. Keep this page open; refreshing can interrupt your view of the result.</p>
           <div className="calculation-progress-copy">
-            <strong>{elapsedSeconds < 60 ? `${elapsedSeconds}s elapsed` : `${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s elapsed`}</strong>
-            <span>
-              {elapsedSeconds < 45
-                ? "Preparing and optimising the full-year profile…"
-                : elapsedSeconds < 120
-                  ? "The optimisation is still running. Render cold starts and annual profiles can take longer."
-                  : "This is taking longer than usual, but the request is still active. The page will update when the backend responds."}
-            </span>
+            <strong>{formatElapsed(elapsedSeconds)}</strong>
+            <span>{loadingMessage(elapsedSeconds)}</span>
+          </div>
+          <div className="calculation-context-inline">
+            <span><strong>Input:</strong> {draft.inputFileName || "annual workbook"}</span>
+            <span><strong>Retention:</strong> {draft.retainData ? "save result" : "transient"}</span>
           </div>
         </div>
       </AppShell>
@@ -207,32 +216,22 @@ export default function ResultsPage() {
 
   return (
     <AppShell>
-      <div className="step-heading"><h1>Calculation Results</h1><p>Step 4 of 4</p></div>
+      <div className="step-heading"><h1>Calculation Results</h1><p>Step 4 of 4 · Review, download, or start another scenario.</p></div>
       <StepIndicator current={4} />
 
       {error && (
-        <div className="error-box" role="alert">
-          <strong>Calculation error</strong>
-          <span>{error}</span>
+        <div className="error-box calculation-error-panel" role="alert">
+          <strong>Calculation could not be completed</strong>
+          <span>{error.message}</span>
+          {debugEnabled && (error.code || error.status) && (
+            <div className="debug-error-details"><span>HTTP {error.status ?? "—"}</span><span>Error code: {error.code || "—"}</span></div>
+          )}
           <div className="calculation-error-actions">
-            <button className="btn btn-small btn-primary" onClick={retryCalculation}>
-              <RefreshCcw size={16} /> Retry Calculation
-            </button>
-            <button className="btn btn-small" onClick={() => window.location.assign("/calculator/battery-costs")}>
-              <ArrowLeft size={16} /> Back to Battery Cost
-            </button>
-            <button className="btn btn-small" onClick={() => window.location.assign("/calculator/load-solar")}>
-              Return to Step 1
-            </button>
+            <button className="btn btn-small btn-primary" onClick={retryCalculation}><RefreshCcw size={16} /> Retry Calculation</button>
+            <button className="btn btn-small" onClick={() => window.location.assign("/calculator/battery-costs")}><ArrowLeft size={16} /> Back to Battery Cost</button>
+            <button className="btn btn-small" onClick={() => window.location.assign("/calculator/load-solar")}>Return to Step 1</button>
           </div>
-        </div>
-      )}
-
-
-      {downloadError && (
-        <div className="error-box" role="alert">
-          <strong>Download error</strong>
-          <span>{downloadError}</span>
+          <small className="error-preservation-note">Your workbook and current inputs remain in this browser, so retrying does not require another upload.</small>
         </div>
       )}
 
@@ -253,15 +252,12 @@ export default function ResultsPage() {
             <ShieldCheck size={19} />
             <div>
               <strong>{data.retained ? "Saved calculation" : "Private transient calculation"}</strong>
-              <span>
-                {data.retained
-                  ? "The input and result artifacts were retained by the backend for later access."
-                  : "The backend processed this request without creating a calculation record or storing the uploaded file/results."}
-              </span>
+              <span>{data.retained ? "The input and result artifacts were retained by the backend for later access." : "The backend processed this request without creating a calculation record or storing the uploaded file/results."}</span>
             </div>
+            <span className="status-pill status-completed">Completed</span>
           </div>
 
-          <section className="metrics-grid">
+          <section className="metrics-grid" aria-label="Key results">
             <Metric icon={<BatteryCharging size={23} />} tone="green" label="Recommended Battery" value={`${result.optimal_battery_size_kwh.toFixed(2)} kWh`} />
             <Metric icon={<BarChart3 size={23} />} tone="purple" label="Annual Bill Reduction" value={`$${result.estimated_annual_bill_reduction_aud.toFixed(2)}`} badge={`${result.estimated_annual_bill_reduction_percent.toFixed(1)}%`} />
             <Metric icon={<CircleDollarSign size={23} />} tone="gold" label="Simple Payback" value={result.simple_payback_years === null ? "N/A" : `${result.simple_payback_years.toFixed(1)} yr`} />
@@ -284,85 +280,47 @@ export default function ResultsPage() {
           </section>
 
           <section className="card page-card-space">
-            <div className="card-header">
-              <div>
-                <h2>{data.retained ? "Calculation Record" : "Calculation Details"}</h2>
-                <p className="admin-card-subtitle">
-                  {data.retained
-                    ? "Saved in the backend with its unique input and canonical CSV."
-                    : "Displayed from this transient response; no backend calculation record was created."}
-                </p>
-              </div>
-            </div>
+            <div className="card-header"><div><h2>{data.retained ? "Calculation Record" : "Calculation Details"}</h2><p className="admin-card-subtitle">{data.retained ? "Saved in the backend with its unique input and canonical CSV." : "Displayed from this transient response; no backend calculation record was created."}</p></div></div>
             <div className="result-details-grid">
               <Detail label="Input file" value={data.input_filename || "—"} />
               <Detail label="Location" value={location || "Not provided"} />
               <Detail label="Retention" value={data.retained ? "Saved" : "Not saved"} />
-              <Detail label="Runtime" value={`${data.runtime_ms} ms`} />
+              <Detail label="Runtime" value={formatRuntime(data.runtime_ms)} />
               <Detail label="Engine" value={data.algorithm_version || result.engine} />
               <Detail label="PV size" value={`${result.pv_size_kw} kW`} />
               <Detail label="Profile duration" value={`${result.profile_duration_hours.toLocaleString()} hours`} />
             </div>
-            {data.warnings.length > 0 && <div className="notice"><strong>Warnings:</strong> {data.warnings.join(" ")}</div>}
+            {data.warnings.length > 0 && <div className="notice result-warning"><strong>Warnings:</strong> {data.warnings.join(" ")}</div>}
           </section>
 
           <section className="card page-card-space">
-            <div className="card-header">
-              <div>
-                <h2>Downloads</h2>
-                <p className="admin-card-subtitle">
-                  {data.retained
-                    ? (token
-                        ? "Stored artifacts are protected by this guest calculation's private browser token."
-                        : "Stored artifacts are protected by your signed-in account session.")
-                    : "The canonical result CSV is returned inline for this transient calculation and is not stored by the backend."}
-                </p>
-              </div>
-            </div>
+            <div className="card-header"><div><h2>Downloads</h2><p className="admin-card-subtitle">{data.retained ? (token ? "Stored artifacts are protected by this guest calculation's private browser token." : "Stored artifacts are protected by your signed-in account session.") : "The canonical result CSV is returned inline for this transient calculation and is not stored by the backend."}</p></div></div>
+            {downloadError && <div className="error-box download-feedback" role="alert"><strong>Download failed</strong><span>{downloadError}</span></div>}
+            {downloadSuccess && <div className="success-box download-feedback" role="status">{downloadSuccess}</div>}
             <div className="download-grid">
               {data.retained && data.files.map((file) => (
-                <button
-                  className="download-card"
-                  key={file.id}
-                  disabled={downloading === file.id}
-                  onClick={() => downloadStored(file.id, file.filename)}
-                >
+                <button className="download-card" key={file.id} disabled={downloading === file.id} onClick={() => downloadStored(file.id, file.filename)}>
                   <FileSpreadsheet size={22} />
-                  <span>
-                    <strong>{file.filename}</strong>
-                    <small>{file.kind === "legacy_csv" ? "Canonical result CSV" : "Original uploaded input"} · {(file.size_bytes / 1024).toFixed(1)} KB</small>
-                  </span>
-                  <Download size={18} />
+                  <span><strong>{file.filename}</strong><small>{file.kind === "legacy_csv" ? "Canonical result CSV" : "Original uploaded input"} · {(file.size_bytes / 1024).toFixed(1)} KB</small></span>
+                  {downloading === file.id ? <span className="spinner-dark spinner-small" aria-label="Downloading"/> : <Download size={18} />}
                 </button>
               ))}
 
               {!data.retained && data.transient_csv && (
                 <button className="download-card" onClick={downloadTransient}>
                   <FileSpreadsheet size={22} />
-                  <span>
-                    <strong>{data.transient_csv.filename}</strong>
-                    <small>Transient canonical result CSV · {(data.transient_csv.size_bytes / 1024).toFixed(1)} KB</small>
-                  </span>
+                  <span><strong>{data.transient_csv.filename}</strong><small>Transient canonical result CSV · {(data.transient_csv.size_bytes / 1024).toFixed(1)} KB</small></span>
                   <Download size={18} />
                 </button>
               )}
             </div>
           </section>
 
-          {!data.retained && (
-            <div className="notice privacy-notice">
-              <strong>Privacy note:</strong>&nbsp; This result will not appear in My Calculations because the backend did not retain it. Download the CSV before leaving if you need a copy.
-            </div>
-          )}
+          {!data.retained && <div className="notice privacy-notice"><strong>Privacy note:</strong>&nbsp; This result will not appear in My Calculations because the backend did not retain it. Download the CSV before leaving if you need a copy.</div>}
 
-          <div className="notice"><strong>Algorithm integrity:</strong> {result.algorithm_source} · SHA-256 {result.algorithm_sha256.slice(0, 16)}…</div>
+          <div className="notice algorithm-integrity"><strong>Algorithm integrity:</strong> {result.algorithm_source} · SHA-256 {result.algorithm_sha256.slice(0, 16)}…</div>
           <div className="button-row">
-            <button
-              className="btn"
-              onClick={() => window.location.assign(data.retained ? "/results-history" : "/calculator/load-solar")}
-            >
-              <ArrowLeft size={18} /> {data.retained ? "My Calculations" : "Back to Inputs"}
-            </button>
+            <button className="btn" onClick={() => window.location.assign(data.retained ? "/results-history" : "/calculator/load-solar")}><ArrowLeft size={18} /> {data.retained ? "My Calculations" : "Back to Inputs"}</button>
             <button className="btn btn-primary btn-lg" onClick={startNew}>New Calculation <ArrowRight size={18} /></button>
           </div>
         </>
@@ -371,18 +329,35 @@ export default function ResultsPage() {
   );
 }
 
-function calculationErrorMessage(error: unknown) {
+function calculationErrorState(error: unknown): CalculationErrorState {
   if (error instanceof ApiRequestError) {
-    if (error.status === 502) {
-      return `${error.message} The workbook passed validation, so the failure occurred while the calculation engine was running. Your inputs are still available and you can retry without uploading again.`;
-    }
-    if (error.status === 503 || error.status === 504) {
-      return `${error.message} Your inputs are still available; wait for the backend to recover and retry.`;
-    }
-    if (error.status === 401) return "Your account session expired. Sign in again, then retry the calculation.";
-    if (error.status === 403) return "This saved calculation is not accessible with the current account or guest token.";
+    let message = error.message;
+    if (error.status === 502) message = `${error.message} The workbook passed validation, so the failure occurred while the calculation engine was running.`;
+    else if (error.status === 503 || error.status === 504) message = `${error.message} The backend is temporarily unavailable or still recovering. Wait briefly and retry.`;
+    else if (error.status === 401) message = "Your account session expired. Sign in again, then retry the calculation.";
+    else if (error.status === 403) message = "This saved calculation is not accessible with the current account or guest token.";
+    return { message, status: error.status, code: error.code };
   }
-  return error instanceof Error ? error.message : "The calculation could not be completed.";
+  return { message: error instanceof Error ? error.message : "The calculation could not be completed." };
+}
+
+function loadingMessage(elapsedSeconds: number) {
+  if (elapsedSeconds < 20) return "Uploading the validated annual profile to the calculation service…";
+  if (elapsedSeconds < 60) return "Preparing the annual profile and starting the optimiser…";
+  if (elapsedSeconds < 120) return "The full-year optimisation is running. This can take longer on a cold backend instance.";
+  if (elapsedSeconds < 240) return "The optimisation is still active. Keep this page open while the backend finishes processing.";
+  return "This run is taking longer than usual. The request is still active unless the backend returns an error.";
+}
+
+function formatElapsed(seconds: number) {
+  return seconds < 60 ? `${seconds}s elapsed` : `${Math.floor(seconds / 60)}m ${seconds % 60}s elapsed`;
+}
+
+function formatRuntime(milliseconds: number) {
+  if (!Number.isFinite(milliseconds)) return "—";
+  if (milliseconds < 1000) return `${Math.round(milliseconds)} ms`;
+  const seconds = milliseconds / 1000;
+  return seconds < 60 ? `${seconds.toFixed(1)} s` : `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
 }
 
 function Metric({ icon, tone, label, value, badge }: { icon: React.ReactNode; tone: "green" | "purple" | "gold"; label: string; value: string; badge?: string }) {

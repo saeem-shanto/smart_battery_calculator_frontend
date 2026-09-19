@@ -1,4 +1,4 @@
-# Production Deployment — Frontend v1.5.6
+# Production Deployment — Frontend v1.5.7
 
 ## Vercel frontend environment
 
@@ -7,7 +7,7 @@ NEXT_PUBLIC_API_BASE_URL=https://smart-battery-calculator-backend-2.onrender.com
 NEXT_PUBLIC_MAX_UPLOAD_MB=15
 NEXT_PUBLIC_APP_DEBUG=false
 APP_DEBUG_BUILD=false
-NEXT_PUBLIC_APP_VERSION=1.5.6
+NEXT_PUBLIC_APP_VERSION=1.5.7
 ```
 
 `NEXT_PUBLIC_API_BASE_URL` is a browser-visible configuration value, not a secret.

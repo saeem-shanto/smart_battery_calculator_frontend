@@ -1,27 +1,22 @@
-# Frontend v1.5.6 Production Summary
+# Frontend v1.5.7 Production Summary
 
-- Removed the Next.js API proxy layer (`app/api/*`) and server token helpers.
-- Browser now calls Django `/api/v1` directly for every application API.
-- Added shared direct API/JWT client with automatic access-token refresh.
-- User and admin sessions use per-tab `sessionStorage`, not long-lived local storage.
-- Protected avatars and files are downloaded through authenticated fetch requests.
-- Guest calculation tokens remain supported through `X-Calculation-Token`.
-- Signed-in retained calculations are owned by the Django user and do not require a guest token.
-- Direct uploads remove the Vercel Function body-size bottleneck.
-- Added transient-result session caching/attempt protection so refreshing Step 4 does not silently rerun an expensive private calculation.
-- Separated calculation errors from download errors.
-- Invalid replacement uploads clear stale IndexedDB workbook data.
-- Existing theme, layout, sidebar, charts and icon system remain unchanged.
-- App browser icon/title branding retained.
-- Development debug overlay retained and production-disabled by environment setting.
-- Next.js updated to the current 15.5 maintenance patch target (`15.5.25`).
+v1.5.7 is a full UI/UX refinement of the direct-Django frontend. It intentionally preserves the approved theme, layout, sidebar, page hierarchy, charts and Lucide icon language.
 
-## v1.5.6 validation UX refinement
+## What changed
+- Calculator upload supports click/keyboard/drag-drop and clearer validation/removal state.
+- Invalid fields receive inline messages, red border/shadow, and first-error focus/scroll.
+- Steps 2–3 carry forward validated workflow context and explain locked client assumptions.
+- Results distinguish progress, engine errors, download errors, retained results and transient results.
+- Long calculations show elapsed progress; successful transient results are session-cached to avoid silent reruns after refresh.
+- Registration/login/profile forms have stronger field-level validation, password guidance and saved/unsaved states.
+- Account outages are distinguished from true guest mode.
+- History has search, counts, clearer status/empty states, claiming feedback and consistent in-app deletion confirmation.
+- Tariffs have load/refresh/search/type-filter/count/empty states.
+- Help adds troubleshooting for the real production failure modes.
+- About exposes the actual browser → Django → Supabase/Octave architecture and app version.
+- Admin filters, record editing, error/warning inspection and file actions are clearer and safer.
+- All destructive confirmations use a consistent in-app dialog instead of native browser confirms.
+- User/admin shells include skip links; active nav uses `aria-current`; focus/reduced-motion behavior is improved.
+- Development debug overlay remains available without changing production UI.
 
-- Registration API validation is mapped to the exact form field instead of exposing raw Django keys.
-- `non_field_errors` containing password-quality failures are attached to the Password field.
-- Invalid account/admin/profile/password inputs receive the existing red border/focus ring.
-- The first invalid field is focused and smoothly scrolled into view.
-- Field messages render directly below the corresponding input and are linked with `aria-invalid` / `aria-describedby` where applicable.
-- Field errors clear as the user edits the affected value.
-- Login credential failures use a concise user-facing message rather than raw backend validation structures.
+See `FRONTEND_UI_UX_REVIEW_v1.5.7.md` and `FRONTEND_V1.5.7_REGRESSION_CHECKLIST.md` for the detailed review/test matrix.

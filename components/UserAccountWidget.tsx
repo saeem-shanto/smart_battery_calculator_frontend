@@ -11,24 +11,30 @@ export function UserAccountWidget() {
   const [user, setUser] = useState<UserSummary | null | undefined>(undefined);
   const [accountUnavailable, setAccountUnavailable] = useState(false);
   const [avatarVersion, setAvatarVersion] = useState(0);
+  const [working, setWorking] = useState(false);
 
-  useEffect(() => {
-    getCurrentUser().then((next) => { setUser(next); setAccountUnavailable(false); }).catch(() => {
+  async function refresh() {
+    try {
+      const next = await getCurrentUser();
+      setUser(next);
+      setAccountUnavailable(false);
+      setAvatarVersion((value) => value + 1);
+    } catch {
       setAccountUnavailable(hasAuthSession("user"));
       setUser(null);
-    });
-    const refresh = () => {
-      getCurrentUser().then((next) => {
-        setUser(next);
-        setAccountUnavailable(false);
-        setAvatarVersion((value) => value + 1);
-      }).catch(() => { setAccountUnavailable(hasAuthSession("user")); setUser(null); });
-    };
-    window.addEventListener("smart-battery:user-changed", refresh);
-    return () => window.removeEventListener("smart-battery:user-changed", refresh);
+    }
+  }
+
+  useEffect(() => {
+    void refresh();
+    const changed = () => void refresh();
+    window.addEventListener("smart-battery:user-changed", changed);
+    return () => window.removeEventListener("smart-battery:user-changed", changed);
   }, []);
 
   async function signOut() {
+    if (working) return;
+    setWorking(true);
     await logoutUser().catch(() => undefined);
     setUser(null);
     window.dispatchEvent(new Event("smart-battery:user-changed"));
@@ -44,6 +50,7 @@ export function UserAccountWidget() {
       <div className="account-widget guest-account-widget" title="The backend account service is temporarily unavailable.">
         <div className="account-avatar-placeholder"><UserRound size={17}/></div>
         <div className="account-widget-copy"><strong>Account unavailable</strong><span>Your browser session is preserved.</span></div>
+        <button className="account-icon-link account-retry" type="button" onClick={() => void refresh()} aria-label="Retry account connection" title="Retry">Retry</button>
       </div>
     );
   }
@@ -61,19 +68,10 @@ export function UserAccountWidget() {
   return (
     <div className="account-widget">
       <a className="account-avatar" href="/account/profile" aria-label="Open profile">
-        <ProtectedAvatar
-          role="user"
-          enabled={Boolean(user.avatar_download_path)}
-          version={avatarVersion}
-          alt=""
-          fallback={<UserRound size={18}/>}
-        />
+        <ProtectedAvatar role="user" enabled={Boolean(user.avatar_download_path)} version={avatarVersion} alt="" fallback={<UserRound size={18}/>} />
       </a>
-      <a className="account-widget-copy" href="/account/profile">
-        <strong>{user.name}</strong>
-        <span>@{user.username}</span>
-      </a>
-      <button className="account-icon-link" type="button" onClick={signOut} title="Sign out" aria-label="Sign out"><LogOut size={18}/></button>
+      <a className="account-widget-copy" href="/account/profile"><strong>{user.name}</strong><span>@{user.username}</span></a>
+      <button className="account-icon-link" type="button" onClick={signOut} disabled={working} title="Sign out" aria-label="Sign out"><LogOut size={18}/></button>
     </div>
   );
 }

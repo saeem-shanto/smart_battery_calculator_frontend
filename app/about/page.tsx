@@ -2,9 +2,15 @@ import { BatteryCharging, ChartNoAxesCombined, Database, ServerCog, UserRound } 
 import { AppShell } from "@/components/AppShell";
 
 export default function AboutPage(){
+  const version = process.env.NEXT_PUBLIC_APP_VERSION || "development";
   return <AppShell>
     <div className="page-header"><h1>About</h1><p>Industrial Research Project N01 — Smart Battery Calculator.</p></div>
-    <div className="about-hero"><BatteryCharging size={42}/><div><h2>Solar PV battery decision-support platform</h2><p>The application connects a Next.js user interface to a Django REST API and executes the client-provided MATLAB optimisation unchanged through GNU Octave.</p></div></div>
+    <div className="about-hero"><BatteryCharging size={42}/><div><h2>Solar PV battery decision-support platform</h2><p>The application uses Next.js as the frontend and calls the Django REST API directly. Django validates annual profiles and executes the client-provided MATLAB optimisation through GNU Octave.</p><span className="about-version">Frontend version {version}</span></div></div>
+
+    <div className="architecture-strip page-card-space" aria-label="Application architecture">
+      <span>Next.js frontend</span><strong>→</strong><span>Django REST API</span><strong>→</strong><span>Supabase + GNU Octave</span>
+    </div>
+
     <div className="help-grid page-card-space">
       <section className="info-card"><ServerCog size={22}/><h2>Optimisation</h2><p>The original MATLAB source is preserved and integrity-checked. GNU Octave provides the server-side compatible runtime.</p></section>
       <section className="info-card"><Database size={22}/><h2>Privacy &amp; auditability</h2><p>Retention is optional. Saved calculations keep searchable metadata and private file references, while transient calculations create no backend calculation/file record.</p></section>

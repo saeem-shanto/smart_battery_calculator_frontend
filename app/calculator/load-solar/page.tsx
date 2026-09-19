@@ -1,13 +1,7 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
-import {
-  ArrowRight,
-  CheckCircle2,
-  FileSpreadsheet,
-  ShieldCheck,
-  Upload,
-} from "lucide-react";
+import { ChangeEvent, DragEvent, FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
+import { ArrowRight, CheckCircle2, FileSpreadsheet, ShieldCheck, Upload } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { StepIndicator } from "@/components/StepIndicator";
 import { getDraft, saveDraft } from "@/lib/draft";
@@ -30,8 +24,10 @@ export default function LoadSolarPage() {
   const [validation, setValidation] = useState<WorkbookValidationResponse | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
+  const [dragging, setDragging] = useState(false);
 
   const uploadRef = useRef<HTMLLabelElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const postcodeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -60,17 +56,41 @@ export default function LoadSolarPage() {
     window.setTimeout(() => element.focus({ preventScroll: true }), 250);
   }
 
+  function localFileError(file: File) {
+    const extension = file.name.toLowerCase().split(".").pop();
+    if (!["xls", "xlsx", "csv", "txt"].includes(extension || "")) return "Upload an XLS, XLSX, CSV, or TXT profile file.";
+    if (file.size === 0) return "The selected file is empty.";
+    if (file.size > MAX_MB * 1024 * 1024) return `File must be ${MAX_MB} MB or smaller.`;
+    return "";
+  }
+
+  async function clearSelectedFile(preserveError = false) {
+    clearCachedTransientResult();
+    await clearDraftFile().catch(() => undefined);
+    setFileName("");
+    setFileSize(0);
+    setValidation(null);
+    if (!preserveError) setErrors((current) => ({ ...current, file: undefined }));
+    saveDraft({
+      inputFileName: undefined,
+      inputFileSize: undefined,
+      workbookValidation: undefined,
+      publicId: undefined,
+      accessToken: undefined,
+    });
+  }
+
   async function validateAndStore(file: File): Promise<boolean> {
     setSaving(true);
     clearCachedTransientResult();
     setErrors((current) => ({ ...current, file: undefined }));
     setValidation(null);
+    setFileName(file.name);
+    setFileSize(file.size);
 
     try {
       const checked = await validateClientWorkbook(file);
       await saveDraftFile(file);
-      setFileName(file.name);
-      setFileSize(file.size);
       setValidation(checked);
       saveDraft({
         inputFileName: file.name,
@@ -83,8 +103,6 @@ export default function LoadSolarPage() {
     } catch (error) {
       const message = getApiFieldMessage(error, "file") || (error instanceof Error ? error.message : "The workbook could not be validated.");
       await clearDraftFile().catch(() => undefined);
-      setFileName(file.name);
-      setFileSize(file.size);
       setValidation(null);
       setErrors((current) => ({ ...current, file: message }));
       saveDraft({
@@ -101,40 +119,37 @@ export default function LoadSolarPage() {
     }
   }
 
-  async function onFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    const extension = file.name.toLowerCase().split(".").pop();
-    let message = "";
-    if (!["xls", "xlsx", "csv", "txt"].includes(extension || "")) {
-      message = "Upload an XLS, XLSX, CSV, or TXT profile file.";
-    } else if (file.size === 0) {
-      message = "The selected file is empty.";
-    } else if (file.size > MAX_MB * 1024 * 1024) {
-      message = `File must be ${MAX_MB} MB or smaller.`;
-    }
-
+  async function acceptFile(file: File) {
+    const message = localFileError(file);
     if (message) {
-      clearCachedTransientResult();
-      await clearDraftFile().catch(() => undefined);
+      await clearSelectedFile(true);
       setFileName(file.name);
       setFileSize(file.size);
-      setValidation(null);
       setErrors((current) => ({ ...current, file: message }));
-      saveDraft({
-        inputFileName: undefined,
-        inputFileSize: undefined,
-        workbookValidation: undefined,
-        publicId: undefined,
-        accessToken: undefined,
-      });
       reveal(uploadRef.current);
       return;
     }
-
     await validateAndStore(file);
+  }
+
+  async function onFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) await acceptFile(file);
+  }
+
+  async function onDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    setDragging(false);
+    if (saving) return;
+    const file = event.dataTransfer.files?.[0];
+    if (file) await acceptFile(file);
+  }
+
+  function openPicker(event: KeyboardEvent<HTMLLabelElement>) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    fileInputRef.current?.click();
   }
 
   async function submit(event: FormEvent) {
@@ -172,58 +187,63 @@ export default function LoadSolarPage() {
     window.location.assign("/calculator/tariff");
   }
 
+  const ready = Boolean(fileName && validation && !saving && !errors.file);
+
   return (
     <AppShell>
       <form onSubmit={submit} noValidate>
-        <div className="step-heading">
-          <h1>New Calculation</h1>
-          <p>Step 1 of 4</p>
-        </div>
+        <div className="step-heading"><h1>New Calculation</h1><p>Step 1 of 4 · Add the annual profile and optional record details.</p></div>
         <StepIndicator current={1} />
 
         <section className="section-card">
-          <h2 className="section-title">Upload annual load &amp; PV data</h2>
-          <p className="section-subtitle">
-            The client algorithm uses the first column as the base PV profile and the second column as household load. A complete annual profile is required.
-          </p>
+          <div className="section-heading-row">
+            <div>
+              <h2 className="section-title">Upload annual load &amp; PV data</h2>
+              <p className="section-subtitle">The client algorithm uses the first column as the base PV profile and the second column as household load. A complete annual profile is required.</p>
+            </div>
+            {validation && <span className="status-pill status-completed">Validated</span>}
+          </div>
 
           <label
             ref={uploadRef}
-            className={`production-upload ${errors.file ? "input-error" : ""}`}
+            className={`production-upload ${dragging ? "is-dragging" : ""} ${errors.file ? "input-error" : ""}`}
             htmlFor="profile-file"
-            tabIndex={-1}
+            tabIndex={0}
             aria-invalid={Boolean(errors.file)}
+            aria-describedby={errors.file ? "profile-file-error" : validation ? "profile-file-success" : "profile-file-help"}
+            onKeyDown={openPicker}
+            onDragEnter={(event) => { event.preventDefault(); if (!saving) setDragging(true); }}
+            onDragOver={(event) => event.preventDefault()}
+            onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
+            onDrop={(event) => void onDrop(event)}
           >
             <div className="production-upload-icon"><Upload size={26} /></div>
             <div>
-              <strong>{fileName || "Choose input file"}</strong>
-              <span>
+              <strong>{fileName || (dragging ? "Drop file to validate" : "Choose or drop input file")}</strong>
+              <span id="profile-file-help">
                 {fileName
-                  ? `${(fileSize / 1024).toFixed(1)} KB · ${saving ? "validating with backend…" : validation ? "validated and ready" : "awaiting validation"}`
+                  ? `${(fileSize / 1024).toFixed(1)} KB · ${saving ? "validating with backend…" : validation ? "validated and ready" : "not validated"}`
                   : `Accepted: .xls, .xlsx, .csv, .txt · up to ${MAX_MB} MB`}
               </span>
             </div>
-            <span className="btn btn-outline-green">{saving ? "Validating…" : "Select File"}</span>
+            <span className="btn btn-outline-green" aria-hidden="true">{saving ? "Validating…" : fileName ? "Replace File" : "Select File"}</span>
           </label>
-          <input
-            id="profile-file"
-            type="file"
-            accept=".xls,.xlsx,.csv,.txt"
-            hidden
-            onChange={onFile}
-            disabled={saving}
-          />
-          {errors.file && <div className="field-message error" role="alert">{errors.file}</div>}
+          <input ref={fileInputRef} id="profile-file" type="file" accept=".xls,.xlsx,.csv,.txt" hidden onChange={onFile} disabled={saving} />
+          {errors.file && <div id="profile-file-error" className="field-message error" role="alert">{errors.file}</div>}
+
+          {fileName && !saving && (
+            <div className="file-inline-actions">
+              <span>{validation ? "This file is ready for the next step." : "This file must be validated before continuing."}</span>
+              <button className="text-button" type="button" onClick={() => void clearSelectedFile()} disabled={saving}>Remove file</button>
+            </div>
+          )}
 
           {validation && (
-            <div className="upload-summary upload-summary-valid">
+            <div id="profile-file-success" className="upload-summary upload-summary-valid" role="status" aria-live="polite">
               <CheckCircle2 size={19} />
               <div>
                 <strong>Workbook validated</strong>
-                <span>
-                  {validation.row_count.toLocaleString()} usable rows · {validation.detected_format.toUpperCase()}
-                  {validation.profile_is_full_year ? " · complete annual profile" : ""}
-                </span>
+                <span>{validation.row_count.toLocaleString()} usable rows · {validation.detected_format.toUpperCase()}{validation.profile_is_full_year ? " · complete annual profile" : ""}</span>
                 {validation.warnings.length > 0 && <small>{validation.warnings.join(" ")}</small>}
               </div>
             </div>
@@ -232,12 +252,10 @@ export default function LoadSolarPage() {
 
         <section className="section-card">
           <h2 className="section-title">Location &amp; record information</h2>
-          <p className="section-subtitle">
-            These fields do not change the optimisation. If retention is enabled, they help identify the calculation later.
-          </p>
+          <p className="section-subtitle">These fields do not change the optimisation. If retention is enabled, they help identify the calculation later.</p>
           <div className="form-grid">
-            <div className="field">
-              <label htmlFor="postcode">Postcode</label>
+            <div className={`field${errors.postcode ? " has-error" : ""}`}>
+              <label htmlFor="postcode">Postcode <span className="optional-label">Optional</span></label>
               <input
                 ref={postcodeRef}
                 id="postcode"
@@ -246,22 +264,22 @@ export default function LoadSolarPage() {
                 maxLength={4}
                 value={postcode}
                 aria-invalid={Boolean(errors.postcode)}
-                aria-describedby={errors.postcode ? "postcode-error" : undefined}
-                onChange={(event) => {
-                  setPostcode(event.target.value.replace(/\D/g, ""));
-                  setErrors((current) => ({ ...current, postcode: undefined }));
-                }}
+                aria-describedby={errors.postcode ? "postcode-error" : "postcode-help"}
+                onBlur={() => { if (postcode && !/^\d{4}$/.test(postcode)) setErrors((current) => ({ ...current, postcode: "Postcode must be a 4-digit Australian postcode." })); }}
+                onChange={(event) => { setPostcode(event.target.value.replace(/\D/g, "")); setErrors((current) => ({ ...current, postcode: undefined })); }}
                 placeholder="e.g. 5000"
               />
-              {errors.postcode && <div id="postcode-error" className="field-message error">{errors.postcode}</div>}
+              <div id="postcode-help" className="field-help">Used only as searchable record information.</div>
+              {errors.postcode && <div id="postcode-error" className="field-message error" role="alert">{errors.postcode}</div>}
             </div>
             <div className="field">
-              <label htmlFor="suburb">Suburb</label>
-              <input id="suburb" className="input" maxLength={120} value={suburb} onChange={(event) => setSuburb(event.target.value)} placeholder="e.g. Adelaide" />
+              <label htmlFor="suburb">Suburb <span className="optional-label">Optional</span></label>
+              <input id="suburb" className="input" maxLength={120} value={suburb} onChange={(event) => setSuburb(event.target.value)} placeholder="e.g. Adelaide" autoComplete="address-level2" />
+              <div className="field-help">Helps you recognise saved calculations later.</div>
             </div>
             <div className="field">
               <label htmlFor="state">State</label>
-              <select id="state" className="input" value={state} onChange={(event) => setState(event.target.value)}>
+              <select id="state" className="input" value={state} onChange={(event) => setState(event.target.value)} autoComplete="address-level1">
                 <option>SA</option><option>NSW</option><option>VIC</option><option>QLD</option><option>WA</option><option>TAS</option><option>ACT</option><option>NT</option>
               </select>
             </div>
@@ -276,21 +294,24 @@ export default function LoadSolarPage() {
             </div>
             <ShieldCheck size={24} />
           </div>
-          <label className="consent-row retention-toggle">
+          <label className={`consent-row retention-toggle ${retainData ? "selected" : ""}`}>
             <input type="checkbox" checked={retainData} onChange={(event) => setRetainData(event.target.checked)} />
             <span>
               <strong>Save my uploaded file and calculation for later access.</strong>
               <small>If enabled, the backend retains the input, calculation record and canonical result CSV. If disabled, processing is transient and no calculation/file record is stored server-side. The selected workbook is kept temporarily in this browser while you move between steps or retry.</small>
             </span>
+            <span className={`retention-state ${retainData ? "on" : "off"}`}>{retainData ? "ON" : "OFF"}</span>
           </label>
         </section>
 
-        <div className="notice">
+        <div className={`notice workflow-readiness ${ready ? "ready" : ""}`} role="status">
           <FileSpreadsheet size={17} />
           <span>
-            {retainData
-              ? "Retention is ON: after calculation, the backend will keep the uploaded input and result artifacts for later access."
-              : "Retention is OFF: the backend will process the workbook transiently and return the result without saving the household file or calculation record."}
+            {!ready
+              ? saving ? "Validating the selected workbook before you can continue…" : "Validate an annual workbook to continue."
+              : retainData
+                ? "Ready to continue. Retention is ON, so the backend will keep the input and result artifacts after calculation."
+                : "Ready to continue. Retention is OFF, so the backend will process the workbook without saving a calculation/file record."}
           </span>
         </div>
 
