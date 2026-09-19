@@ -48,13 +48,10 @@ export async function readJson<T>(response: Response): Promise<T> {
       ? (payload as ErrorPayload).error
       : undefined;
     const fields = error?.fields && typeof error.fields === "object" ? error.fields : null;
-    const details = fields
-      ? Object.entries(fields)
-          .map(([key, value]) => `${key}: ${fieldText(value)}`)
-          .filter((value) => !value.endsWith(": "))
-          .join(" ")
-      : "";
-    const message = [error?.message || `Request failed with HTTP ${response.status}.`, details].filter(Boolean).join(" ");
+    // Keep field details structured on ApiRequestError.fields. Do not append raw
+    // backend field names (for example `non_field_errors`) to the user-facing
+    // message; field-aware forms render those messages beside the right input.
+    const message = error?.message || `Request failed with HTTP ${response.status}.`;
     throw new ApiRequestError(message, response.status, { code: error?.code, fields });
   }
   if (response.status === 204) return undefined as T;

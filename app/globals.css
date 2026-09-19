@@ -534,3 +534,9 @@ button.account-icon-link { cursor: pointer; }
   .profile-form { padding: 18px 16px 0; }
   .profile-card > .success-box, .profile-card > .error-box, .profile-inner-alert { margin-left: 16px; margin-right: 16px; }
 }
+
+/* Field-level validation refinements */
+.field.has-error label { color: #b42318; }
+.field.has-error { scroll-margin-top: 96px; }
+.login-input-wrap .input.input-error { border-color: #d92d20 !important; box-shadow: 0 0 0 3px rgba(217,45,32,.08) !important; }
+.login-input-wrap:has(.input-error) > svg { color: #b42318; }

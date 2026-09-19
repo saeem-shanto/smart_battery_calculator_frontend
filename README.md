@@ -1,4 +1,4 @@
-# Smart Battery Calculator Frontend — v1.5.5 Production
+# Smart Battery Calculator Frontend — v1.5.6 Production
 
 Production Next.js frontend for Project N01. The visual theme, layout and existing icon language are preserved from the approved prototype.
 
@@ -45,7 +45,7 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000/api/v1
 NEXT_PUBLIC_MAX_UPLOAD_MB=15
 NEXT_PUBLIC_APP_DEBUG=true
 APP_DEBUG_BUILD=true
-NEXT_PUBLIC_APP_VERSION=1.5.5
+NEXT_PUBLIC_APP_VERSION=1.5.6
 ```
 
 Then:
@@ -72,7 +72,7 @@ NEXT_PUBLIC_API_BASE_URL=https://smart-battery-calculator-backend-2.onrender.com
 NEXT_PUBLIC_MAX_UPLOAD_MB=15
 NEXT_PUBLIC_APP_DEBUG=false
 APP_DEBUG_BUILD=false
-NEXT_PUBLIC_APP_VERSION=1.5.5
+NEXT_PUBLIC_APP_VERSION=1.5.6
 ```
 
 On the Django/Render service, allow the exact deployed frontend origin:

@@ -1,4 +1,4 @@
-# Frontend ↔ Backend Integration — v1.5.5
+# Frontend ↔ Backend Integration — v1.5.6
 
 ## Direct API contract
 
