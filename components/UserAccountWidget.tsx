@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LogIn, LogOut, UserRound } from "lucide-react";
+import { LogIn, LogOut, Settings, UserRound } from "lucide-react";
 import { getCurrentUser, logoutUser } from "@/lib/account-api";
 import { ProtectedAvatar } from "./ProtectedAvatar";
 import { hasAuthSession } from "@/lib/backend-client";
@@ -66,11 +66,17 @@ export function UserAccountWidget() {
   }
 
   return (
-    <div className="account-widget">
-      <a className="account-avatar" href="/account/profile" aria-label="Open profile">
+    <div className="account-widget account-widget-signed-in">
+      <a className="account-avatar" href="/account/profile" aria-label="Open account settings">
         <ProtectedAvatar role="user" enabled={Boolean(user.avatar_download_path)} version={avatarVersion} alt="" fallback={<UserRound size={18}/>} />
       </a>
-      <a className="account-widget-copy" href="/account/profile"><strong>{user.name}</strong><span>@{user.username}</span></a>
+      <div className="account-widget-copy">
+        <a className="account-identity-link" href="/account/profile"><strong>{user.name}</strong><span>@{user.username}</span></a>
+        <a className="account-settings-link" href="/account/profile" aria-label="Open account settings">
+          <Settings size={13}/>
+          <span>Account Settings</span>
+        </a>
+      </div>
       <button className="account-icon-link" type="button" onClick={signOut} disabled={working} title="Sign out" aria-label="Sign out"><LogOut size={18}/></button>
     </div>
   );

@@ -234,11 +234,13 @@ export default function ProfilePage() {
   return (
     <AppShell>
       <div className="page-top-row">
-        <div className="page-header"><h1>My Profile</h1><p>Manage your account identity and optional profile picture.</p></div>
+        <div className="page-header"><h1>Account Settings</h1><p>Manage your profile, email security, password and two-factor authentication.</p></div>
         <button className="btn" type="button" onClick={signOut}><LogOut size={18}/> Sign Out</button>
       </div>
 
-      <section className="card page-card-space profile-card">
+      <nav className="account-settings-nav" aria-label="Account settings sections"><a href="#profile-details">Profile Details</a><a href="#two-factor-security">Two-Factor Authentication</a><a href="#password-security">Password</a></nav>
+
+      <section id="profile-details" className="card page-card-space profile-card account-settings-section">
         <div className="profile-avatar-panel">
           <div className="profile-avatar-large">
             <ProtectedAvatar role="user" enabled={Boolean(user.avatar_download_path)} version={avatarVersion} alt="Profile" fallback={<UserRound size={42}/>} />
@@ -262,9 +264,9 @@ export default function ProfilePage() {
         </form>
       </section>
 
-      <TwoFactorSettings role="user" user={user} onUserChanged={(next)=>{ setUser(next); setProfile((current)=>({...current, email: next.email || ""})); setSavedProfile((current)=>({...current, email: next.email || ""})); }} />
+      <div id="two-factor-security" className="account-settings-section"><TwoFactorSettings role="user" user={user} onUserChanged={(next)=>{ setUser(next); setProfile((current)=>({...current, email: next.email || ""})); setSavedProfile((current)=>({...current, email: next.email || ""})); }} /></div>
 
-      <section className="card page-card-space profile-card">
+      <section id="password-security" className="card page-card-space profile-card account-settings-section">
         <div className="card-header"><div><h2>Change Password</h2><p className="admin-card-subtitle">Changing your password signs out all existing account sessions.</p></div><KeyRound size={22}/></div>
         {passwordError && <div className="error-box profile-inner-alert">{passwordError}</div>}
         <form className="account-form profile-form" onSubmit={passwordSubmit} noValidate>

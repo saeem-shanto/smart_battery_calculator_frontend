@@ -107,7 +107,7 @@ export default function DashboardPage() {
               {online === false && <button type="button" className="status-retry" onClick={checkBackend}><RefreshCcw size={13}/> Retry</button>}
             </div>
           </div>
-          {user && <div className="dashboard-account-greeting">Signed in as <strong>{user.name}</strong>. Saved calculations will be linked to your account.</div>}
+          {user && <div className="dashboard-account-greeting">Signed in as <strong>{user.name}</strong>. Saved calculations will be linked to your account. <a href="/account/profile">Manage account & security</a></div>}
         </div>
         <SolarIllustration/>
       </section>

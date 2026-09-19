@@ -1,4 +1,4 @@
-# Smart Battery Calculator Frontend — v1.5.8 Production
+# Smart Battery Calculator Frontend — v1.5.8.3 Production
 
 Production Next.js frontend for Project N01. The visual theme, layout and existing icon language are preserved from the approved prototype.
 
@@ -30,9 +30,9 @@ There is no `app/api/*` application proxy layer in this build.
 - Debug overlay for development only
 - Smart Battery Calculator browser title icon
 
-## v1.5.8 UI/UX refinement
+## v1.5.8.3 UI/UX refinement
 
-The approved visual theme/layout/icons are unchanged. This release improves calculator guidance and validation, account/profile forms, retained/transient result states, history/search/confirmation flows, tariff filtering, admin management states, accessibility, mobile behavior, and debug feedback. See `FRONTEND_UI_UX_REVIEW_v1.5.8.md`.
+The approved visual theme/layout/icons are unchanged. This release improves calculator guidance and validation, account/profile forms, retained/transient result states, history/search/confirmation flows, tariff filtering, admin management states, accessibility, mobile behavior, and debug feedback. See `FRONTEND_UI_UX_REVIEW_v1.5.8.3.md`.
 
 ## Authentication
 
@@ -49,7 +49,7 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000/api/v1
 NEXT_PUBLIC_MAX_UPLOAD_MB=15
 NEXT_PUBLIC_APP_DEBUG=true
 APP_DEBUG_BUILD=true
-NEXT_PUBLIC_APP_VERSION=1.5.8
+NEXT_PUBLIC_APP_VERSION=1.5.8.3
 ```
 
 Then:
@@ -76,7 +76,7 @@ NEXT_PUBLIC_API_BASE_URL=https://smart-battery-calculator-backend-2.onrender.com
 NEXT_PUBLIC_MAX_UPLOAD_MB=15
 NEXT_PUBLIC_APP_DEBUG=false
 APP_DEBUG_BUILD=false
-NEXT_PUBLIC_APP_VERSION=1.5.8
+NEXT_PUBLIC_APP_VERSION=1.5.8.3
 ```
 
 On the Django/Render service, allow the exact deployed frontend origin:
@@ -103,7 +103,7 @@ npm run build
 
 The package intentionally does not include a stale `package-lock.json`; run `npm install` once in your normal internet-connected development environment and commit the newly generated lockfile before your final repository release.
 
-## Email security flows (v1.5.8)
+## Email security flows (v1.5.8.3)
 
 The frontend now supports the backend's optional email security features without changing the direct Next.js-to-Django REST architecture:
 
