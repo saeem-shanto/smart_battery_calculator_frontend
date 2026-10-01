@@ -38,7 +38,7 @@ export function UserAccountWidget() {
     await logoutUser().catch(() => undefined);
     setUser(null);
     window.dispatchEvent(new Event("smart-battery:user-changed"));
-    window.location.assign("/dashboard");
+    window.location.assign("/");
   }
 
   if (user === undefined) {

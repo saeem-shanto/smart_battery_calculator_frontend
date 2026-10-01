@@ -14,7 +14,7 @@ export function AdminShell({children,onLogout,active="records"}:{children:React.
       <nav className="sidebar-nav" aria-label="Admin navigation">
         <a href="/admin" className={`nav-item ${active==="records"?"active":""}`} aria-current={active==="records"?"page":undefined}><LayoutDashboard size={21}/><span>Calculation Records</span></a>
         <a href="/admin/profile" className={`nav-item ${active==="profile"?"active":""}`} aria-current={active==="profile"?"page":undefined}><UserRound size={21}/><span>Admin Profile</span></a>
-        <a href="/dashboard" className="nav-item"><ExternalLink size={21}/><span>User Website</span></a>
+        <a href="/" className="nav-item"><ExternalLink size={21}/><span>User Website</span></a>
       </nav>
       <button className="nav-item admin-logout" onClick={onLogout}><LogOut size={21}/><span>Log Out</span></button>
       <div className="sidebar-tip"><ShieldCheck size={20}/><span>Authenticated administration for calculation records, stored inputs and result CSV files.</span></div>

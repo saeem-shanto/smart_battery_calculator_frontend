@@ -17,6 +17,7 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   productionBrowserSourceMaps: debugBuild,
   async headers() {
+    const noIndex = [{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" }];
     return [
       {
         source: "/:path*",
@@ -27,6 +28,13 @@ const nextConfig: NextConfig = {
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
         ],
       },
+      { source: "/account/:path*", headers: noIndex },
+      { source: "/admin/:path*", headers: noIndex },
+      { source: "/results-history", headers: noIndex },
+      { source: "/saved-scenarios", headers: noIndex },
+      { source: "/calculator/results", headers: noIndex },
+      { source: "/calculator/tariff", headers: noIndex },
+      { source: "/calculator/battery-costs", headers: noIndex },
     ];
   },
 };

@@ -219,7 +219,7 @@ export default function ProfilePage() {
   async function signOut() {
     await logoutUser().catch(() => undefined);
     window.dispatchEvent(new Event("smart-battery:user-changed"));
-    window.location.replace("/dashboard");
+    window.location.replace("/");
   }
 
   if (loading || !user) return <AppShell><div className="loading-inline"><span className="spinner-dark"/> Loading account…</div></AppShell>;

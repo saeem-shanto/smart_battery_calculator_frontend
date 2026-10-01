@@ -1,7 +1,21 @@
 import { AppShell } from "@/components/AppShell";
+import { JsonLd } from "@/components/JsonLd";
 
 export default function HelpPage(){
-  return <AppShell>
+  const faqData = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      { "@type": "Question", name: "Could not reach the Django backend", acceptedAnswer: { "@type": "Answer", text: "Confirm the backend service is online, the production frontend API URL points to the correct HTTPS Django origin, and that Django CORS allows this frontend origin." } },
+      { "@type": "Question", name: "Workbook validation fails", acceptedAnswer: { "@type": "Answer", text: "Use one of the supported file types and make sure the first two columns contain numeric PV and load values for the required annual profile. The validation message should identify the issue before calculation starts." } },
+      { "@type": "Question", name: "The calculation engine returns an error", acceptedAnswer: { "@type": "Answer", text: "If the workbook passed validation, the failure occurred while the backend calculation engine was running. Your browser keeps the current draft so you can retry without uploading the file again." } },
+      { "@type": "Question", name: "A transient result disappeared", acceptedAnswer: { "@type": "Answer", text: "Transient results are not retained by the backend. The current browser tab caches the immediate response, but you should download the canonical CSV before leaving if you need a copy." } },
+      { "@type": "Question", name: "Account calculations are temporarily unavailable", acceptedAnswer: { "@type": "Answer", text: "A backend outage does not automatically clear the browser session. Retry when the backend is available; guest records stored in this browser remain accessible separately." } }
+    ]
+  };
+  return <>
+    <JsonLd data={faqData} />
+    <AppShell>
     <div className="page-header"><h1>Help</h1><p>How to run, understand, and manage a Smart Battery Calculator result.</p></div>
 
     <div className="help-grid">
@@ -27,5 +41,6 @@ export default function HelpPage(){
     </section>
 
     <div className="notice page-card-space"><strong>Research tool:</strong>&nbsp; Outputs are decision-support estimates produced from the supplied algorithm and input data. They are not financial, electrical-installation, or engineering advice.</div>
-  </AppShell>;
+    </AppShell>
+  </>;
 }

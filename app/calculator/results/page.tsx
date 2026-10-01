@@ -16,6 +16,7 @@ import {
 import { AppShell } from "@/components/AppShell";
 import { StepIndicator } from "@/components/StepIndicator";
 import { BillComparisonChart } from "@/components/Charts";
+import { InfoTip } from "@/components/InfoTip";
 import { clearDraft, getDraft, saveDraft } from "@/lib/draft";
 import { clearDraftFile, getDraftFile } from "@/lib/file-store";
 import {
@@ -258,23 +259,23 @@ export default function ResultsPage() {
           </div>
 
           <section className="metrics-grid" aria-label="Key results">
-            <Metric icon={<BatteryCharging size={23} />} tone="green" label="Recommended Battery" value={`${result.optimal_battery_size_kwh.toFixed(2)} kWh`} />
-            <Metric icon={<BarChart3 size={23} />} tone="purple" label="Annual Bill Reduction" value={`$${result.estimated_annual_bill_reduction_aud.toFixed(2)}`} badge={`${result.estimated_annual_bill_reduction_percent.toFixed(1)}%`} />
-            <Metric icon={<CircleDollarSign size={23} />} tone="gold" label="Simple Payback" value={result.simple_payback_years === null ? "N/A" : `${result.simple_payback_years.toFixed(1)} yr`} />
-            <Metric icon={<Gauge size={23} />} tone="purple" label="Net Annual Payment" value={`$${result.net_annual_payment_aud.toFixed(2)}`} />
+            <Metric icon={<BatteryCharging size={23} />} tone="green" label="Recommended Battery" value={`${result.optimal_battery_size_kwh.toFixed(2)} kWh`} info="The battery capacity selected by the client MATLAB/Octave optimisation. The model searches the configured battery range and selects the capacity that minimises net annual payment under the fixed algorithm assumptions." />
+            <Metric icon={<BarChart3 size={23} />} tone="purple" label="Annual Bill Reduction" value={`$${result.estimated_annual_bill_reduction_aud.toFixed(2)}`} badge={`${result.estimated_annual_bill_reduction_percent.toFixed(1)}%`} info="The difference between the no-battery baseline annual payment and the optimised net annual payment. The percentage is the same reduction expressed relative to the baseline." />
+            <Metric icon={<CircleDollarSign size={23} />} tone="gold" label="Simple Payback" value={result.simple_payback_years === null ? "N/A" : `${result.simple_payback_years.toFixed(1)} yr`} info="A simple recovery-time estimate based on battery upfront cost divided by the reported annual payment reduction. It does not model financing, discount rates, battery replacement, or future tariff changes." />
+            <Metric icon={<Gauge size={23} />} tone="purple" label="Net Annual Payment" value={`$${result.net_annual_payment_aud.toFixed(2)}`} info="The client model's annual objective value: annual battery payment plus grid import cost, minus feed-in-tariff revenue." />
           </section>
 
           <section className="charts-grid single-chart">
-            <BillComparisonChart withoutBattery={result.baseline_annual_payment_aud} withBattery={result.net_annual_payment_aud} />
+            <BillComparisonChart withoutBattery={result.baseline_annual_payment_aud} withBattery={result.net_annual_payment_aud} showInfo />
             <div className="card result-summary-panel">
               <div className="card-header"><h2>Energy Summary</h2></div>
               <div className="result-summary-list">
-                <Summary label="Annual load" value={`${result.annual_load_kwh.toLocaleString()} kWh`} />
-                <Summary label="Annual PV generation" value={`${result.annual_pv_generation_kwh.toLocaleString()} kWh`} />
-                <Summary label="Grid import" value={`${result.import_from_grid_kwh_year.toLocaleString()} kWh`} />
-                <Summary label="Grid export" value={`${result.export_to_grid_kwh_year.toLocaleString()} kWh`} />
-                <Summary label="Self-consumption" value={`${result.baseline_self_consumption_percent.toFixed(1)}% → ${result.self_consumption_percent.toFixed(1)}%`} />
-                <Summary label="Battery upfront cost" value={`$${result.battery_upfront_cost_aud.toLocaleString()}`} />
+                <Summary label="Annual load" value={`${result.annual_load_kwh.toLocaleString()} kWh`} info="Total household electricity consumption in the uploaded annual load profile." />
+                <Summary label="Annual PV generation" value={`${result.annual_pv_generation_kwh.toLocaleString()} kWh`} info="Total PV energy used by the calculation after applying the client model's PV scaling assumptions." />
+                <Summary label="Grid import" value={`${result.import_from_grid_kwh_year.toLocaleString()} kWh`} info="Total energy purchased from the grid after PV generation and available battery discharge are accounted for." />
+                <Summary label="Grid export" value={`${result.export_to_grid_kwh_year.toLocaleString()} kWh`} info="Total surplus PV energy exported after household demand and available battery charging are satisfied." />
+                <Summary label="Self-consumption" value={`${result.baseline_self_consumption_percent.toFixed(1)}% → ${result.self_consumption_percent.toFixed(1)}%`} info="The share of generated solar used by the household instead of being exported. The first value is the no-battery baseline and the second is the result with the recommended battery." />
+                <Summary label="Battery upfront cost" value={`$${result.battery_upfront_cost_aud.toLocaleString()}`} info="Recommended battery capacity multiplied by the installed battery cost entered in Step 3. This reporting value does not change the MATLAB/Octave optimisation." />
               </div>
             </div>
           </section>
@@ -360,14 +361,14 @@ function formatRuntime(milliseconds: number) {
   return seconds < 60 ? `${seconds.toFixed(1)} s` : `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
 }
 
-function Metric({ icon, tone, label, value, badge }: { icon: React.ReactNode; tone: "green" | "purple" | "gold"; label: string; value: string; badge?: string }) {
-  return <div className="metric-card"><div className="metric-top"><div className={`metric-icon ${tone}`}>{icon}</div><div>{label}</div></div><div className="metric-value">{value}{badge && <span className="mini-pill">{badge}</span>}</div></div>;
+function Metric({ icon, tone, label, value, badge, info }: { icon: React.ReactNode; tone: "green" | "purple" | "gold"; label: string; value: string; badge?: string; info: string }) {
+  return <div className="metric-card"><div className="metric-top"><div className={`metric-icon ${tone}`}>{icon}</div><div className="metric-label"><span>{label}</span><InfoTip text={info} label={`About ${label}`} /></div></div><div className="metric-value">{value}{badge && <span className="mini-pill">{badge}</span>}</div></div>;
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
   return <div className="result-detail-card"><span>{label}</span><strong>{value}</strong></div>;
 }
 
-function Summary({ label, value }: { label: string; value: string }) {
-  return <div className="summary-row"><span>{label}</span><strong>{value}</strong></div>;
+function Summary({ label, value, info }: { label: string; value: string; info: string }) {
+  return <div className="summary-row"><span className="summary-label"><span>{label}</span><InfoTip text={info} label={`About ${label}`} /></span><strong>{value}</strong></div>;
 }

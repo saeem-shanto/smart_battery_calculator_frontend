@@ -148,7 +148,7 @@ export default function AdminLoginPage() {
         </form>
         <div className="admin-security-note"><LockKeyhole size={16}/><span>Credentials are verified directly by Django. The admin session is kept only in the current browser tab and sent to the backend in Authorization headers.</span></div>
         <div className="account-form-footer"><a href="/account/forgot-password">Forgot password?</a></div>
-        <a className="admin-back-link" href="/dashboard">← Back to user dashboard</a>
+        <a className="admin-back-link" href="/">← Back to user dashboard</a>
         </>}
       </section>
     </main>

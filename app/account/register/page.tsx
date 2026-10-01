@@ -169,7 +169,7 @@ export default function RegisterPage() {
           </div>
           <button className="btn btn-primary btn-lg account-form-submit" type="submit" disabled={working}>{working ? "Creating account…" : "Create Account"}</button>
         </form>
-        <div className="account-form-footer">Already registered? <a href="/account/login">Sign in</a> · <a href="/dashboard">Continue as guest</a></div>
+        <div className="account-form-footer">Already registered? <a href="/account/login">Sign in</a> · <a href="/">Continue as guest</a></div>
       </section>
     </AppShell>
   );

@@ -71,7 +71,7 @@ export default function UserLoginPage() {
       }
       window.dispatchEvent(new Event("smart-battery:user-changed"));
       const nextPath = new URLSearchParams(window.location.search).get("next");
-      window.location.replace(nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/dashboard");
+      window.location.replace(nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/");
     } catch (caught) {
       if (caught instanceof ApiRequestError) {
         const backendErrors: LoginErrors = {
@@ -101,7 +101,7 @@ export default function UserLoginPage() {
       await verifyLoginTwoFactor("user", challenge.challengeId, code);
       window.dispatchEvent(new Event("smart-battery:user-changed"));
       const nextPath = new URLSearchParams(window.location.search).get("next");
-      window.location.replace(nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/dashboard");
+      window.location.replace(nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/");
     } finally {
       setWorking(false);
     }
@@ -146,7 +146,7 @@ export default function UserLoginPage() {
           <button className="btn btn-primary btn-lg account-form-submit" type="submit" disabled={working}>{working ? "Signing in…" : "Sign In"}</button>
           <div className="form-security-note">For this production frontend, the account session is kept only in the current browser tab and sent directly to Django with authenticated API requests.</div>
         </form>
-        <div className="account-form-footer"><a href="/account/forgot-password">Forgot password?</a> · No account yet? <a href="/account/register">Create one</a> · <a href="/dashboard">Continue as guest</a></div>
+        <div className="account-form-footer"><a href="/account/forgot-password">Forgot password?</a> · No account yet? <a href="/account/register">Create one</a> · <a href="/">Continue as guest</a></div>
         </>}
       </section>
     </AppShell>

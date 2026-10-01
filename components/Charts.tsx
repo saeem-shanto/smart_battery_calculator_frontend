@@ -1,10 +1,12 @@
+import { InfoTip } from "./InfoTip";
+
 function niceCeiling(value: number, minimum: number) {
   const safe = Math.max(value, minimum);
   const magnitude = Math.pow(10, Math.floor(Math.log10(safe)));
   return Math.ceil(safe / magnitude * 2) / 2 * magnitude;
 }
 
-export function BillComparisonChart({ withoutBattery = 2400, withBattery = 1350 }: { withoutBattery?: number; withBattery?: number }) {
+export function BillComparisonChart({ withoutBattery = 2400, withBattery = 1350, showInfo = false }: { withoutBattery?: number; withBattery?: number; showInfo?: boolean }) {
   const max = niceCeiling(Math.max(withoutBattery, withBattery) * 1.15, 1000);
   const chartHeight = 220;
   const h1 = Math.max(2, (withoutBattery / max) * chartHeight);
@@ -12,7 +14,7 @@ export function BillComparisonChart({ withoutBattery = 2400, withBattery = 1350 
   const ticks = [max, max * 2 / 3, max / 3, 0];
   return (
     <div className="chart-card">
-      <h3>Electricity Bill Comparison</h3>
+      <div className="chart-title-row"><h3>Electricity Bill Comparison</h3>{showInfo && <InfoTip text="Compares the no-battery baseline annual payment with the client model's optimised net annual payment for the recommended battery." label="About Electricity Bill Comparison" />}</div>
       <div className="bar-chart">
         <div className="y-axis-label">Annual Bill ($)</div>
         <div className="bars-area">
