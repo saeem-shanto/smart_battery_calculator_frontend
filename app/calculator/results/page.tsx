@@ -57,6 +57,8 @@ export default function ResultsPage() {
   const [downloadSuccess, setDownloadSuccess] = useState("");
   const [attempt, setAttempt] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  // Browser-persisted inputs must be read after hydration, never during render.
+  const [draftSummary, setDraftSummary] = useState<ReturnType<typeof getDraft>>({});
   const startedAttempt = useRef<number | null>(null);
 
   useEffect(() => {
@@ -86,6 +88,8 @@ export default function ResultsPage() {
         setError(null);
         setDownloadError("");
         setDownloadSuccess("");
+        const currentDraft = getDraft();
+        setDraftSummary(currentDraft);
         const params = new URLSearchParams(window.location.search);
         const requested = params.get("id");
         if (requested) {
@@ -96,7 +100,7 @@ export default function ResultsPage() {
           return;
         }
 
-        const draft = getDraft();
+        const draft = currentDraft;
         if (draft.publicId) {
           const response = await getCalculation(draft.publicId, draft.accessToken);
           setData(response);
@@ -163,7 +167,6 @@ export default function ResultsPage() {
 
   const result = data?.status === "completed" && isCompleteBatteryResult(data.result) ? data.result : null;
   const location = useMemo(() => [data?.suburb, data?.state, data?.postcode].filter(Boolean).join(", "), [data]);
-  const draft = typeof window !== "undefined" ? getDraft() : {};
 
   async function downloadStored(fileId: string, name: string) {
     if (!data?.public_id) return;
@@ -202,19 +205,19 @@ export default function ResultsPage() {
   if (loading) {
     return (
       <AppShell>
-        <div className="step-heading"><h1>New Calculation</h1><p>Step 4 of 4 · Running the annual optimisation.</p></div>
+        <div className="step-heading"><h1>New Calculation</h1><p>Step 4 of 4 · Calculating with the client MATLAB model.</p></div>
         <StepIndicator current={4} />
         <div className="calculation-loading" role="status" aria-live="polite">
           <span className="spinner-dark" aria-hidden="true" />
-          <h2>Running the battery optimisation…</h2>
-          <p>The backend is processing the annual profile with GNU Octave. Keep this page open; refreshing can interrupt your view of the result.</p>
+          <h2>Calculating your solar and battery scenario…</h2>
+          <p>Django is preparing the annual profile and running the MATLAB calculation with GNU Octave. Keep this page open; refreshing can interrupt your view of the result.</p>
           <div className="calculation-progress-copy">
             <strong>{formatElapsed(elapsedSeconds)}</strong>
-            <span>{loadingMessage(elapsedSeconds, draft.inputMode === "generated")}</span>
+            <span>{loadingMessage(elapsedSeconds, draftSummary.inputMode === "generated")}</span>
           </div>
           <div className="calculation-context-inline">
-            <span><strong>Input:</strong> {draft.inputFileName || "annual PV and load profile"}</span>
-            <span><strong>Retention:</strong> {draft.retainData ? "save result" : "transient"}</span>
+            <span><strong>Input:</strong> {draftSummary.inputFileName || "annual PV and load profile"}</span>
+            <span><strong>Retention:</strong> {draftSummary.retainData ? "save result" : "transient"}</span>
           </div>
         </div>
       </AppShell>
@@ -265,10 +268,10 @@ export default function ResultsPage() {
           </div>
 
           <section className="metrics-grid" aria-label="Key results">
-            <Metric icon={<BatteryCharging size={23} />} tone="green" label="Recommended Battery" value={`${result.optimal_battery_size_kwh.toFixed(2)} kWh`} info="The battery capacity selected by the client MATLAB/Octave optimisation. The model searches the configured battery range and selects the capacity that minimises net annual payment under the fixed algorithm assumptions." />
-            <Metric icon={<BarChart3 size={23} />} tone="purple" label="Annual Bill Reduction" value={`$${result.estimated_annual_bill_reduction_aud.toFixed(2)}`} badge={`${result.estimated_annual_bill_reduction_percent.toFixed(1)}%`} info="The difference between the no-battery baseline annual payment and the optimised net annual payment. The percentage is the same reduction expressed relative to the baseline." />
-            <Metric icon={<CircleDollarSign size={23} />} tone="gold" label="Simple Payback" value={result.simple_payback_years === null ? "N/A" : `${result.simple_payback_years.toFixed(1)} yr`} info="A simple recovery-time estimate based on battery upfront cost divided by the reported annual payment reduction. It does not model financing, discount rates, battery replacement, or future tariff changes." />
-            <Metric icon={<Gauge size={23} />} tone="purple" label="Net Annual Payment" value={`$${result.net_annual_payment_aud.toFixed(2)}`} info="The client model's annual objective value: annual battery payment plus grid import cost, minus feed-in-tariff revenue." />
+            <Metric icon={<BatteryCharging size={23} />} tone="green" label={result.calculation_mode === "selected_capacity" ? "Selected Battery" : "Recommended Battery"} value={`${result.optimal_battery_size_kwh.toFixed(2)} kWh`} info={result.calculation_mode === "selected_capacity" ? "The battery capacity you selected in Step 2. The updated MATLAB model evaluates this size; it does not search for an optimum." : "Battery capacity selected by the original MATLAB optimisation."} />
+            <Metric icon={<BarChart3 size={23} />} tone="purple" label={result.calculation_mode === "selected_capacity" ? "Annual Cost Difference" : "Annual Bill Reduction"} value={`$${result.estimated_annual_bill_reduction_aud.toFixed(2)}`} badge={`${result.estimated_annual_bill_reduction_percent.toFixed(1)}%`} info="Difference between the no-battery annual grid cost and the battery scenario annual cost, including its financing instalment. This can be negative." />
+            <Metric icon={<CircleDollarSign size={23} />} tone="gold" label="Simple Payback" value={result.simple_payback_years === null ? "N/A" : `${result.simple_payback_years.toFixed(1)} yr`} info="Simple installation-cost recovery based on annual operating savings before finance charges; not a discounted cash-flow or loan payback model." />
+            <Metric icon={<Gauge size={23} />} tone="purple" label="Net Annual Payment" value={`$${result.net_annual_payment_aud.toFixed(2)}`} info="Annual grid import cost plus financing instalment and daily supply charges, minus solar feed-in revenue." />
           </section>
 
           <section className="charts-grid single-chart">
@@ -277,11 +280,13 @@ export default function ResultsPage() {
               <div className="card-header"><h2>Energy Summary</h2></div>
               <div className="result-summary-list">
                 <Summary label="Annual load" value={`${result.annual_load_kwh.toLocaleString()} kWh`} info="Total household electricity consumption in the uploaded annual load profile." />
-                <Summary label="Annual PV generation" value={`${result.annual_pv_generation_kwh.toLocaleString()} kWh`} info="Total PV energy used by the calculation after applying the client model's PV scaling assumptions." />
+                <Summary label="Annual PV generation" value={`${result.annual_pv_generation_kwh.toLocaleString()} kWh`} info="Annual solar generation for the PV system size you entered, using Renewables.ninja weather data." />
+                {result.calculation_mode === "selected_capacity" && typeof result.annual_installment_aud === "number" && <Summary label="Annual financing instalment" value={`$${result.annual_installment_aud.toLocaleString()}`} info="Annual capital-recovery payment calculated by the backend for the total financed installation cost and loan terms you selected." />}
+                {result.calculation_mode === "selected_capacity" && typeof result.annual_operating_savings_before_financing_aud === "number" && <Summary label="Operating savings before financing" value={`$${result.annual_operating_savings_before_financing_aud.toLocaleString()}`} info="Estimated annual grid-operating savings before including financing instalments; used for the displayed simple payback estimate." />}
                 <Summary label="Grid import" value={`${result.import_from_grid_kwh_year.toLocaleString()} kWh`} info="Total energy purchased from the grid after PV generation and available battery discharge are accounted for." />
                 <Summary label="Grid export" value={`${result.export_to_grid_kwh_year.toLocaleString()} kWh`} info="Total surplus PV energy exported after household demand and available battery charging are satisfied." />
-                <Summary label="Self-consumption" value={`${result.baseline_self_consumption_percent.toFixed(1)}% → ${result.self_consumption_percent.toFixed(1)}%`} info="The share of generated solar used by the household instead of being exported. The first value is the no-battery baseline and the second is the result with the recommended battery." />
-                <Summary label="Battery upfront cost" value={`$${result.battery_upfront_cost_aud.toLocaleString()}`} info="Recommended battery capacity multiplied by the installed battery cost entered in Step 3. This reporting value does not change the MATLAB/Octave optimisation." />
+                <Summary label="Self-consumption" value={`${result.baseline_self_consumption_percent.toFixed(1)}% → ${result.self_consumption_percent.toFixed(1)}%`} info="The share of PV generation not exported, before and after the selected battery configuration. This includes curtailed energy and is an approximation, not direct household self-consumption measurement." />
+                <Summary label={result.calculation_mode === "selected_capacity" ? "Financed installation cost" : "Battery upfront cost"} value={`$${result.battery_upfront_cost_aud.toLocaleString()}`} info="For the updated model, this is the total financed installation cost from Step 3; it contributes to annual financing. For the original model, it is the battery cost used for simple payback." />
               </div>
             </div>
           </section>
@@ -355,9 +360,9 @@ function loadingMessage(elapsedSeconds: number, generated = false) {
   if (elapsedSeconds < 20) return generated
     ? "Fetching solar weather and preparing the annual inputs in Django…"
     : "Uploading the validated annual profile to the calculation service…";
-  if (elapsedSeconds < 60) return "Preparing the annual profile and starting the optimiser…";
-  if (elapsedSeconds < 120) return "The full-year optimisation is running. This can take longer on a cold backend instance.";
-  if (elapsedSeconds < 240) return "The optimisation is still active. Keep this page open while the backend finishes processing.";
+  if (elapsedSeconds < 60) return "Preparing the annual profile and starting GNU Octave…";
+  if (elapsedSeconds < 120) return "The annual MATLAB simulation is running. This can take longer on a cold backend instance.";
+  if (elapsedSeconds < 240) return "The calculation is still active. Keep this page open while the backend finishes processing.";
   return "This run is taking longer than usual. The request is still active unless the backend returns an error.";
 }
 

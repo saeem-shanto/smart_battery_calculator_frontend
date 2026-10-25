@@ -14,6 +14,8 @@ export function transientFingerprint(draft: DraftCalculation): string {
   return JSON.stringify({
     inputMode: draft.inputMode || "upload",
     generatedInput: draft.inputMode === "generated" ? draft.generatedInput : undefined,
+    algorithmVersion: draft.algorithmVersion,
+    v1Inputs: draft.v1Inputs,
     inputFileName: draft.inputFileName || "",
     inputFileSize: draft.inputFileSize || 0,
     postcode: draft.postcode || "",

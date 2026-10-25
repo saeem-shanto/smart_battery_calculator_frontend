@@ -1,3 +1,5 @@
+import type { AlgorithmV1Inputs } from "./algorithm-v1";
+
 export type WorkbookValidationResponse = {
   valid: boolean;
   original_name: string;
@@ -18,6 +20,9 @@ export type GeneratedInput = {
 export type DraftCalculation = {
   inputMode?: "generated" | "upload";
   generatedInput?: GeneratedInput;
+  /** Inputs for the updated MATLAB adapter, executed only by Django. */
+  algorithmVersion?: "batt_cal_v1";
+  v1Inputs?: AlgorithmV1Inputs;
 
   inputFileName?: string;
   inputFileSize?: number;
@@ -36,6 +41,11 @@ export type DraftCalculation = {
 
 export type BatteryCalculationResult = {
   optimal_battery_size_kwh: number;
+  calculation_mode?: "selected_capacity";
+  battery_capacity_kwh?: number;
+  annual_installment_aud?: number;
+  annual_operating_savings_before_financing_aud?: number;
+  model_losses_kwh_year?: number;
   net_annual_payment_aud: number;
   baseline_annual_payment_aud: number;
   estimated_annual_bill_reduction_aud: number;

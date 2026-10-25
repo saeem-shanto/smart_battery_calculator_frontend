@@ -6,6 +6,7 @@ import type {
   WorkbookValidationResponse,
 } from "./types";
 import { optionalUserFetch, publicFetch } from "./backend-client";
+import { validV1Inputs } from "./algorithm-v1";
 
 type ErrorPayload = {
   error?: {
@@ -94,6 +95,23 @@ export async function runWorkbookCalculation(draft: DraftCalculation, file: File
     "metadata",
     JSON.stringify({ frontend: "nextjs-direct-api", workflow: "client_workbook", retention_requested: Boolean(draft.retainData) }),
   );
+  if (draft.algorithmVersion === "batt_cal_v1") {
+    if (!validV1Inputs(draft.v1Inputs)) throw new Error("Finish configuring the updated MATLAB inputs in Steps 2 and 3.");
+    const v1 = draft.v1Inputs;
+    form.append("settings", JSON.stringify({
+      battery_capacity_kwh: v1.batteryCapacityKwh,
+      pv_capacity_kw: v1.pvCapacityKw,
+      interest_rate_percent: v1.interestRatePercent,
+      installation_cost_aud: v1.installationCostAud,
+      loan_period_years: v1.loanPeriodYears,
+      daily_supply_charge_aud: v1.dailySupplyChargeAud,
+      retail_tariff_24h: v1.retailTariff24h,
+      feed_in_tariff_24h: v1.feedInTariff24h,
+    }));
+    return readJson<CalculationResponse>(
+      await optionalUserFetch("/calculations/client-workbook-v1/", { method: "POST", body: form }),
+    );
+  }
   form.append("battery_installed_cost_per_kwh", String(draft.batteryInstalledCostPerKwh ?? 1000));
   return readJson<CalculationResponse>(
     await optionalUserFetch("/calculations/client-workbook/", { method: "POST", body: form }),
@@ -158,6 +176,10 @@ export async function runGeneratedCalculation(draft: DraftCalculation) {
   if (!generated || !draft.postcode || !draft.state || generated.loadProfile24h.length !== 24) {
     throw new Error("Generated inputs are incomplete. Return to Step 1 to enter your postcode and 24 hourly values.");
   }
+  if (!validV1Inputs(draft.v1Inputs)) {
+    throw new Error("Complete your battery, solar, tariff and financial inputs before calculating.");
+  }
+  const v1 = draft.v1Inputs;
   const payload = {
     postcode: draft.postcode,
     state: draft.state,
@@ -168,9 +190,16 @@ export async function runGeneratedCalculation(draft: DraftCalculation) {
     azimuth: generated.azimuth,
     system_loss: generated.systemLoss,
     retain_data: Boolean(draft.retainData),
-    battery_installed_cost_per_kwh: draft.batteryInstalledCostPerKwh ?? 1000,
+    battery_capacity_kwh: v1.batteryCapacityKwh,
+    pv_capacity_kw: v1.pvCapacityKw,
+    interest_rate_percent: v1.interestRatePercent,
+    installation_cost_aud: v1.installationCostAud,
+    loan_period_years: v1.loanPeriodYears,
+    daily_supply_charge_aud: v1.dailySupplyChargeAud,
+    retail_tariff_24h: v1.retailTariff24h,
+    feed_in_tariff_24h: v1.feedInTariff24h,
   };
-  return readJson<CalculationResponse>(await optionalUserFetch("/calculations/generated-annual/", {
+  return readJson<CalculationResponse>(await optionalUserFetch("/calculations/generated-annual-v1/", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

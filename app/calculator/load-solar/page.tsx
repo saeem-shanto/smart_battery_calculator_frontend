@@ -45,7 +45,7 @@ export default function LoadSolarPage() {
     setPostcode(draft.postcode || "");
     setSuburb(draft.suburb || "");
     setState(draft.state || "SA");
-    setRetainData(draft.retainData === true);
+    setRetainData(false);
     setValidation(draft.workbookValidation || null);
     setInputMode(draft.inputMode || "generated");
     if (draft.generatedInput) {
@@ -212,7 +212,7 @@ export default function LoadSolarPage() {
       postcode: postcode.trim(),
       suburb: suburb.trim(),
       state: state.trim(),
-      retainData,
+      retainData: false,
       consent: undefined,
       publicId: undefined,
       accessToken: undefined,
@@ -230,7 +230,7 @@ export default function LoadSolarPage() {
 
         <section className="section-card n01-methods" aria-label="Input method">
           <div className="n01-method-grid">
-            <button type="button" aria-pressed={inputMode === "generated"} className={`n01-method ${inputMode === "generated" ? "is-selected" : ""}`} onClick={() => { setInputMode("generated"); setErrors({}); }}>
+            <button type="button" aria-pressed={inputMode === "generated"} className={`n01-method ${inputMode === "generated" ? "is-selected" : ""}`} onClick={() => { setInputMode("generated"); setRetainData(false); setErrors({}); }}>
               <span className="n01-method-icon"><MapPin size={22}/></span><span><strong>Postcode + 24-hour table</strong><small>Enter your location and typical daily electricity use</small></span><CheckCircle2 size={22}/>
             </button>
             <button type="button" aria-pressed={inputMode === "upload"} className={`n01-method ${inputMode === "upload" ? "is-selected" : ""}`} onClick={() => { setInputMode("upload"); setErrors({}); }}>
@@ -263,7 +263,7 @@ export default function LoadSolarPage() {
               {hourlyLoads.map((load, hour) => <div className="n01-hour" key={hour}><label htmlFor={`load-hour-${hour}`}>{String(hour).padStart(2,"0")}:00–{String((hour + 1) % 24).padStart(2,"0")}:00</label><input className="input" id={`load-hour-${hour}`} type="number" min="0" step="any" required value={load} onChange={event => setHourlyLoads(previous => previous.map((item, index) => index === hour ? event.target.value : item))} aria-label={`Consumption from ${hour}:00 to ${(hour+1)%24}:00 in kWh`}/></div>)}
             </div>
           </div>
-          <div className="n01-summary" aria-live="polite"><div className="n01-summary-title"><BarChart3 size={25}/> <strong>Load summary</strong></div><div><small><Zap size={15}/> Daily load</small><strong>{hourlyLoads.reduce((sum,value)=>sum+(Number(value)||0),0).toFixed(2)} kWh</strong></div><div><small><CalendarDays size={15}/> Approximate annual load</small><strong>{(hourlyLoads.reduce((sum,value)=>sum+(Number(value)||0),0)*365).toLocaleString("en-AU",{maximumFractionDigits:1})} kWh</strong></div><div className="n01-fixed-pv">Fixed PV system size: <strong>5 kW</strong><small>Required by the unchanged MATLAB model</small></div><div className="n01-completeness"><CheckCircle2 size={22}/><span>{hourlyLoads.filter(v => v.trim() !== "" && Number.isFinite(Number(v)) && Number(v) >= 0).length} of 24<small>valid hourly values</small></span></div></div>
+          <div className="n01-summary" aria-live="polite"><div className="n01-summary-title"><BarChart3 size={25}/> <strong>Load summary</strong></div><div><small><Zap size={15}/> Daily load</small><strong>{hourlyLoads.reduce((sum,value)=>sum+(Number(value)||0),0).toFixed(2)} kWh</strong></div><div><small><CalendarDays size={15}/> Approximate annual load</small><strong>{(hourlyLoads.reduce((sum,value)=>sum+(Number(value)||0),0)*365).toLocaleString("en-AU",{maximumFractionDigits:1})} kWh</strong></div><div className="n01-fixed-pv">Solar PV capacity: <strong>Set in Step 2</strong><small>Default 6 kW · adjustable</small></div><div className="n01-completeness"><CheckCircle2 size={22}/><span>{hourlyLoads.filter(v => v.trim() !== "" && Number.isFinite(Number(v)) && Number(v) >= 0).length} of 24<small>valid hourly values</small></span></div></div>
           {errors.file && <div className="field-message error" role="alert">{errors.file}</div>}
           {helpOpen && <div className="n01-modal-overlay" onClick={() => setHelpOpen(false)}><div className="n01-modal" role="dialog" aria-modal="true" aria-labelledby="n01-help-title" onClick={e => e.stopPropagation()}><div className="n01-modal-header"><h2 id="n01-help-title">How to enter your electricity data</h2><button type="button" onClick={() => setHelpOpen(false)} aria-label="Close help"><X size={22}/></button></div><ol><li><strong>Postcode and state:</strong> enter these in the Location section below. The postcode gives an approximate solar simulation location.</li><li><strong>Historical year:</strong> choose a year of solar weather data. It is not the year your electricity was consumed.</li><li><strong>Hourly load:</strong> enter energy in kWh for each one-hour interval. For example, using a 2 kW heater for 30 minutes consumes 1 kWh.</li><li><strong>Solar orientation:</strong> optional advanced settings. Tilt is the panel angle; azimuth is the direction panels face. Defaults are 25° and north.</li><li><strong>Annual simulation:</strong> the same 24-hour load repeats 365 times; this does not model seasonal or weekend variations. PV weather changes hour by hour.</li><li><strong>Next:</strong> Django combines 8,760 hourly PV values and 8,760 hourly load values into the two columns required by the unchanged MATLAB algorithm.</li></ol><button type="button" className="btn btn-primary" onClick={() => setHelpOpen(false)}>Got it</button></div></div>}
         </section>}
@@ -368,12 +368,12 @@ export default function LoadSolarPage() {
             <ShieldCheck size={24} />
           </div>
           <label className={`consent-row retention-toggle ${retainData ? "selected" : ""}`}>
-            <input type="checkbox" checked={retainData} onChange={(event) => setRetainData(event.target.checked)} />
+            <input type="checkbox" checked={false} disabled onChange={(event) => setRetainData(event.target.checked)} />
             <span>
               <strong>Save my annual profile and calculation for later access.</strong>
-              <small>If enabled, the backend retains the input, calculation record and canonical result CSV. If disabled, processing is transient and no calculation/file record is stored server-side. For manual uploads, the selected workbook is kept temporarily in this browser while you move between steps or retry. For postcode-based calculations, only the 24 hourly values and solar settings are kept in your browser draft.</small>
+              <small>The updated MATLAB calculation currently runs privately without server-side retention, for either input method. Your unfinished form values stay in this browser. Saved calculation history can be added after the backend cache is upgraded.</small>
             </span>
-            <span className={`retention-state ${retainData ? "on" : "off"}`}>{retainData ? "ON" : "OFF"}</span>
+            <span className={`retention-state off`}>OFF</span>
           </label>
         </section>
 
@@ -382,16 +382,14 @@ export default function LoadSolarPage() {
           <span>
             {!ready
               ? saving ? "Preparing inputs…" : inputMode === "generated" ? "Enter a postcode and valid 24-hour consumption values to continue." : "Validate an annual workbook to continue."
-              : retainData
-                ? "Ready to continue. Django will prepare and validate the annual profile when the calculation starts. Retention is ON."
-                : "Ready to continue. Django will create the annual profile internally when the calculation starts. Retention is OFF."}
+              : "Ready to continue. Django will create the annual profile internally when the calculation starts. Retention is OFF."}
           </span>
         </div>
 
         <div className="button-row">
           <span />
           <button className="btn btn-primary btn-lg" type="submit" disabled={saving}>
-            {saving ? "Checking inputs…" : "Next: Algorithm"} <ArrowRight size={18} />
+            {saving ? "Checking inputs…" : "Next: System & Tariffs"} <ArrowRight size={18} />
           </button>
         </div>
       </form>
