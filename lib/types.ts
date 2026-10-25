@@ -7,7 +7,18 @@ export type WorkbookValidationResponse = {
   warnings: string[];
 };
 
+export type GeneratedInput = {
+  loadProfile24h: number[];
+  year: number;
+  tilt: number;
+  azimuth: number;
+  systemLoss: number;
+};
+
 export type DraftCalculation = {
+  inputMode?: "generated" | "upload";
+  generatedInput?: GeneratedInput;
+
   inputFileName?: string;
   inputFileSize?: number;
   postcode?: string;

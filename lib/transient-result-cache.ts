@@ -12,6 +12,8 @@ type CachedTransient = {
 
 export function transientFingerprint(draft: DraftCalculation): string {
   return JSON.stringify({
+    inputMode: draft.inputMode || "upload",
+    generatedInput: draft.inputMode === "generated" ? draft.generatedInput : undefined,
     inputFileName: draft.inputFileName || "",
     inputFileSize: draft.inputFileSize || 0,
     postcode: draft.postcode || "",

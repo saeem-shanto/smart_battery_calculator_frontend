@@ -149,3 +149,30 @@ export function downloadBlob(blob: Blob, filename: string) {
   anchor.remove();
   URL.revokeObjectURL(objectUrl);
 }
+
+/** Generate and execute a full-year calculation in one backend request.
+ *  No annual file is transferred to or from the browser.
+ */
+export async function runGeneratedCalculation(draft: DraftCalculation) {
+  const generated = draft.generatedInput;
+  if (!generated || !draft.postcode || !draft.state || generated.loadProfile24h.length !== 24) {
+    throw new Error("Generated inputs are incomplete. Return to Step 1 to enter your postcode and 24 hourly values.");
+  }
+  const payload = {
+    postcode: draft.postcode,
+    state: draft.state,
+    suburb: draft.suburb || "",
+    load_profile_24h: generated.loadProfile24h,
+    year: generated.year,
+    tilt: generated.tilt,
+    azimuth: generated.azimuth,
+    system_loss: generated.systemLoss,
+    retain_data: Boolean(draft.retainData),
+    battery_installed_cost_per_kwh: draft.batteryInstalledCostPerKwh ?? 1000,
+  };
+  return readJson<CalculationResponse>(await optionalUserFetch("/calculations/generated-annual/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }));
+}

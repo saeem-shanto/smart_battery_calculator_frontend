@@ -24,6 +24,8 @@ import {
   downloadTransientCsv,
   getCalculation,
   runWorkbookCalculation,
+  runGeneratedCalculation,
+  getApiFieldMessage,
   ApiRequestError,
 } from "@/lib/api";
 import { getHistoryItem, removeHistoryItem, saveCalculationHistory } from "@/lib/calculation-history";
@@ -117,10 +119,14 @@ export default function ResultsPage() {
           markTransientAttempt(fingerprint);
         }
 
-        const file = await getDraftFile();
-        if (!file) throw new Error("The uploaded input file is no longer available. Return to Step 1 and select it again.");
-
-        const response = await runWorkbookCalculation(draft, file);
+        let response: CalculationResponse;
+        if (draft.inputMode === "generated") {
+          response = await runGeneratedCalculation(draft);
+        } else {
+          const file = await getDraftFile();
+          if (!file) throw new Error("The uploaded input file is no longer available. Return to Step 1 and select it again.");
+          response = await runWorkbookCalculation(draft, file);
+        }
         setData(response);
 
         if (response.retained) {
@@ -204,10 +210,10 @@ export default function ResultsPage() {
           <p>The backend is processing the annual profile with GNU Octave. Keep this page open; refreshing can interrupt your view of the result.</p>
           <div className="calculation-progress-copy">
             <strong>{formatElapsed(elapsedSeconds)}</strong>
-            <span>{loadingMessage(elapsedSeconds)}</span>
+            <span>{loadingMessage(elapsedSeconds, draft.inputMode === "generated")}</span>
           </div>
           <div className="calculation-context-inline">
-            <span><strong>Input:</strong> {draft.inputFileName || "annual workbook"}</span>
+            <span><strong>Input:</strong> {draft.inputFileName || "annual PV and load profile"}</span>
             <span><strong>Retention:</strong> {draft.retainData ? "save result" : "transient"}</span>
           </div>
         </div>
@@ -232,7 +238,7 @@ export default function ResultsPage() {
             <button className="btn btn-small" onClick={() => window.location.assign("/calculator/battery-costs")}><ArrowLeft size={16} /> Back to Battery Cost</button>
             <button className="btn btn-small" onClick={() => window.location.assign("/calculator/load-solar")}>Return to Step 1</button>
           </div>
-          <small className="error-preservation-note">Your workbook and current inputs remain in this browser, so retrying does not require another upload.</small>
+          <small className="error-preservation-note">Your inputs remain in this browser. You can retry without entering them again.</small>
         </div>
       )}
 
@@ -333,7 +339,10 @@ export default function ResultsPage() {
 function calculationErrorState(error: unknown): CalculationErrorState {
   if (error instanceof ApiRequestError) {
     let message = error.message;
-    if (error.status === 502) message = `${error.message} The workbook passed validation, so the failure occurred while the calculation engine was running.`;
+    const inputProblem = ["profile", "postcode", "state", "year", "load_profile_24h", "tilt", "azimuth", "system_loss", "battery_installed_cost_per_kwh", "file"]
+      .map((field) => getApiFieldMessage(error, field)).find(Boolean);
+    if (inputProblem) message = inputProblem;
+    else if (error.status === 502) message = `${error.message} The input passed validation, but the calculation engine could not complete the run.`;
     else if (error.status === 503 || error.status === 504) message = `${error.message} The backend is temporarily unavailable or still recovering. Wait briefly and retry.`;
     else if (error.status === 401) message = "Your account session expired. Sign in again, then retry the calculation.";
     else if (error.status === 403) message = "This saved calculation is not accessible with the current account or guest token.";
@@ -342,8 +351,10 @@ function calculationErrorState(error: unknown): CalculationErrorState {
   return { message: error instanceof Error ? error.message : "The calculation could not be completed." };
 }
 
-function loadingMessage(elapsedSeconds: number) {
-  if (elapsedSeconds < 20) return "Uploading the validated annual profile to the calculation service…";
+function loadingMessage(elapsedSeconds: number, generated = false) {
+  if (elapsedSeconds < 20) return generated
+    ? "Fetching solar weather and preparing the annual inputs in Django…"
+    : "Uploading the validated annual profile to the calculation service…";
   if (elapsedSeconds < 60) return "Preparing the annual profile and starting the optimiser…";
   if (elapsedSeconds < 120) return "The full-year optimisation is running. This can take longer on a cold backend instance.";
   if (elapsedSeconds < 240) return "The optimisation is still active. Keep this page open while the backend finishes processing.";

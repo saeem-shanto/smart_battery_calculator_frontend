@@ -23,7 +23,7 @@ export default function BatteryCostsPage() {
 
   useEffect(() => {
     const current = getDraft();
-    if (!current.inputFileName) {
+    if (!current.inputFileName || (current.inputMode === "generated" && !current.generatedInput)) {
       window.location.replace("/calculator/load-solar");
       return;
     }
@@ -103,7 +103,7 @@ export default function BatteryCostsPage() {
 
         <div className="calculation-ready-note">
           <strong>Ready to calculate</strong>
-          <span>The next step uploads the validated workbook to Django and runs the annual optimisation. Keep the results page open until it finishes.</span>
+          <span>The next step sends your inputs to Django. For postcode-based calculations, Django creates the annual PV/load dataset internally before running the original MATLAB optimisation. Keep this page open until it finishes.</span>
         </div>
 
         <div className="button-row">
