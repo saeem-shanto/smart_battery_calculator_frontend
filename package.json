@@ -9,7 +9,10 @@
     "start": "next start --hostname 0.0.0.0",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf .next",
-    "test:energy-flow": "tsc --target ES2022 --module commonjs --strict --skipLibCheck --outDir dist src/lib/energy-flow.ts && tsc --target ES2022 --module commonjs --strict --skipLibCheck --outDir .flow-test-build lib/energy-flow-scenarios.ts src/lib/energy-flow.ts && node --test tests/energy-flow.test.mjs tests/energy-flow-integration.test.cjs"
+    "test:energy-flow": "tsc --target ES2022 --module commonjs --strict --skipLibCheck --typeRoots ./scripts/empty-types --outDir dist src/lib/energy-flow.ts && tsc --target ES2022 --module commonjs --strict --skipLibCheck --typeRoots ./scripts/empty-types --outDir .flow-test-build lib/energy-flow-scenarios.ts src/lib/energy-flow.ts && node --test tests/energy-flow.test.mjs tests/energy-flow-integration.test.cjs tests/architecture-boundary.test.cjs",
+    "prebuild": "node scripts/verify-build-dependencies.cjs",
+    "verify:dependencies": "node scripts/verify-build-dependencies.cjs",
+    "test:algorithm-v1": "tsc --target ES2022 --module commonjs --strict --skipLibCheck --typeRoots ./scripts/empty-types --outDir .algorithm-test-build lib/algorithm-v1.ts && node --test tests/algorithm-v1-hour-range.test.cjs"
   },
   "dependencies": {
     "@vercel/speed-insights": "^2.0.0",

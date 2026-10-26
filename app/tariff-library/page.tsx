@@ -36,11 +36,11 @@ export default function TariffLibraryPage() {
   return (
     <AppShell>
       <div className="page-top-row">
-        <div className="page-header"><h1>Tariff Library</h1><p>Reference tariff records from the Django backend. The current client optimisation still uses its own fixed retail and feed-in rates.</p></div>
+        <div className="page-header"><h1>Tariff Library</h1><p>Reference tariff records from Django. For a new calculation, edit the 24-hour import and feed-in tariff schedule in Step 2.</p></div>
         <button className="btn" type="button" onClick={load} disabled={loading}><RefreshCcw size={18}/> {loading ? "Refreshing…" : "Refresh"}</button>
       </div>
 
-      <div className="notice page-card-space"><strong>Reference only:</strong>&nbsp; Selecting or viewing a tariff here does not change the current production optimisation. The client MATLAB constants remain retail <strong>$0.3773/kWh</strong> and feed-in <strong>$0.124/kWh</strong>.</div>
+      <div className="notice page-card-space"><strong>Reference only:</strong>&nbsp; The library is for reference. Rates are <strong>not automatically imported</strong> into your calculation; enter the rates you want to evaluate in the System &amp; Tariffs step. The prefilled hourly schedule comes from the client-supplied updated script, not from this library.</div>
 
       <div className="library-toolbar">
         <div className="search-input-wrap"><Search size={20}/><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search provider, tariff name or type…" aria-label="Search tariff library"/>{query && <button className="search-clear" type="button" onClick={() => setQuery("")} aria-label="Clear search"><X size={16}/></button>}</div>

@@ -1,46 +1,45 @@
 import { AppShell } from "@/components/AppShell";
 import { JsonLd } from "@/components/JsonLd";
 
-export default function HelpPage(){
-  const faqData = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    mainEntity: [
-      { "@type": "Question", name: "Could not reach the Django backend", acceptedAnswer: { "@type": "Answer", text: "Confirm the backend service is online, the production frontend API URL points to the correct HTTPS Django origin, and that Django CORS allows this frontend origin." } },
-      { "@type": "Question", name: "Workbook validation fails", acceptedAnswer: { "@type": "Answer", text: "Use one of the supported file types and make sure the first two columns contain numeric PV and load values for the required annual profile. The validation message should identify the issue before calculation starts." } },
-      { "@type": "Question", name: "The calculation engine returns an error", acceptedAnswer: { "@type": "Answer", text: "If the workbook passed validation, the failure occurred while the backend calculation engine was running. Your browser keeps the current draft so you can retry without uploading the file again." } },
-      { "@type": "Question", name: "A transient result disappeared", acceptedAnswer: { "@type": "Answer", text: "Transient results are not retained by the backend. The current browser tab caches the immediate response, but you should download the canonical CSV before leaving if you need a copy." } },
-      { "@type": "Question", name: "Account calculations are temporarily unavailable", acceptedAnswer: { "@type": "Answer", text: "A backend outage does not automatically clear the browser session. Retry when the backend is available; guest records stored in this browser remain accessible separately." } }
-    ]
-  };
+const faqData = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    { "@type": "Question", name: "Does this calculator automatically find the optimal battery capacity?", acceptedAnswer: { "@type": "Answer", text: "No. The current client-supplied batt_cal_v1 model evaluates the battery capacity selected in Step 2. It does not search for the optimal capacity." } },
+    { "@type": "Question", name: "How are solar and household data prepared?", acceptedAnswer: { "@type": "Answer", text: "Use an Australian postcode and 24 hourly consumption readings to request a 365-day dataset, with location-based solar production obtained server-side from Renewables.ninja; alternatively upload a validated annual workbook." } },
+    { "@type": "Question", name: "Can I change the electricity tariff?", acceptedAnswer: { "@type": "Answer", text: "Yes. Step 2 supports a 24-hour retail import price schedule and a separate 24-hour solar feed-in tariff schedule. The prefilled values come from the supplied client script and are not guaranteed to match a household's electricity plan." } },
+    { "@type": "Question", name: "What installation cost should I enter?", acceptedAnswer: { "@type": "Answer", text: "Step 3 accepts the total financed installation cost in AUD, together with an annual interest rate, loan period and daily supply charge. It is not a battery cost per kWh input." } },
+    { "@type": "Question", name: "Why is my result not saved?", acceptedAnswer: { "@type": "Answer", text: "The current updated-model workflow processes calculations transiently; download the returned result CSV before navigating away. Availability of retained results depends on backend version." } },
+    { "@type": "Question", name: "Could not reach the Django backend", acceptedAnswer: { "@type": "Answer", text: "Check that Django is online, NEXT_PUBLIC_API_BASE_URL points to the correct HTTPS backend API, and Django CORS allows the frontend origin." } },
+  ],
+};
+
+export default function HelpPage() {
   return <>
     <JsonLd data={faqData} />
     <AppShell>
-    <div className="page-header"><h1>Help</h1><p>How to run, understand, and manage a Smart Battery Calculator result.</p></div>
-
-    <div className="help-grid">
-      <section className="info-card"><div className="help-step-label">Step 1</div><h2>Upload annual data</h2><p>Select an XLS, XLSX, CSV or TXT file. Column 1 is the base PV profile and column 2 is household load. The file is validated before you can continue.</p></section>
-      <section className="info-card"><div className="help-step-label">Step 1</div><h2>Add optional record information</h2><p>Postcode, suburb and state help identify retained calculations later. They do not change the optimisation.</p></section>
-      <section className="info-card"><div className="help-step-label">Step 2</div><h2>Review locked assumptions</h2><p>The PV size, retail price, feed-in tariff, battery annual rate and search range come directly from the unchanged client MATLAB source and are intentionally not editable.</p></section>
-      <section className="info-card"><div className="help-step-label">Step 3</div><h2>Enter installed battery cost</h2><p>The installed cost per kWh is used only for the displayed simple-payback calculation. It does not change the optimisation objective.</p></section>
-      <section className="info-card"><div className="help-step-label">Privacy</div><h2>Choose whether to save</h2><p>If retention is off, Django/Octave processes the request transiently and returns the result without keeping a calculation/file record. If retention is on, the input and canonical result CSV are retained.</p></section>
-      <section className="info-card"><div className="help-step-label">Access</div><h2>Guest or account</h2><p>Guests revisit retained calculations using a private token stored in that browser. Signed-in users automatically own new retained calculations and can access them through their account.</p></section>
-      <section className="info-card"><div className="help-step-label">Access</div><h2>Claim a guest record</h2><p>After signing in, My Calculations can attach an eligible retained guest calculation from this browser to your account. Account access then replaces the old guest-token access.</p></section>
-      <section className="info-card"><div className="help-step-label">Results</div><h2>Download results</h2><p>Retained calculations expose the stored input and canonical result CSV. Transient calculations provide the canonical CSV only in the immediate result response, so download it before leaving.</p></section>
-    </div>
-
-    <section className="card page-card-space help-troubleshooting">
-      <div className="card-header"><div><h2>Common issues</h2><p className="admin-card-subtitle">Quick checks before you retry or report a problem.</p></div></div>
-      <div className="help-faq-list">
-        <details><summary>“Could not reach the Django backend”</summary><p>Confirm the backend service is online, the production frontend API URL points to the correct HTTPS Django origin, and that Django CORS allows this frontend origin.</p></details>
-        <details><summary>Workbook validation fails</summary><p>Use one of the supported file types and make sure the first two columns contain numeric PV and load values for the required annual profile. The validation message should identify the issue before calculation starts.</p></details>
-        <details><summary>The calculation engine returns an error</summary><p>If the workbook passed validation, the failure occurred while the backend calculation engine was running. Your browser keeps the current draft so you can retry without uploading the file again.</p></details>
-        <details><summary>A transient result disappeared</summary><p>Transient results are not retained by the backend. The current browser tab caches the immediate response, but you should download the canonical CSV before leaving if you need a copy.</p></details>
-        <details><summary>Account calculations are temporarily unavailable</summary><p>A backend outage does not automatically clear the browser session. Retry when the backend is available; guest records stored in this browser remain accessible separately.</p></details>
+      <div className="page-header"><h1>Help</h1><p>Complete a calculation with the updated client MATLAB model, batt_cal_v1.</p></div>
+      <div className="notice page-card-space"><strong>Current calculation mode:</strong>&nbsp; Evaluate a <strong>selected battery capacity</strong>. The research publications discuss optimal sizing, but this version of the client-supplied script does not optimise the battery size for you.</div>
+      <div className="help-grid">
+        <section className="info-card"><div className="help-step-label">Step 1</div><h2>Choose your input method</h2><p>Enter an Australian postcode and 24 hourly electricity-consumption values (kWh), or upload a supported annual XLS/XLSX/CSV/TXT workbook. On the postcode pathway, Django requests location-based PV data from Renewables.ninja and prepares the annual profile.</p></section>
+        <section className="info-card"><div className="help-step-label">Step 1</div><h2>Review solar and time assumptions</h2><p>The 24 input hours represent a typical day repeated across a 365-day simulation year. Choose the historical weather year, panel tilt and orientation. For leap years, the backend prepares the agreed 8,760-hour series. Postcode determines the solar location; suburb is optional record information.</p></section>
+        <section className="info-card"><div className="help-step-label">Step 2</div><h2>Choose battery and PV capacities</h2><p>Set the battery capacity in kWh and solar PV capacity in kW you want to evaluate. The supplied script's example defaults are 15 kWh and 6 kW. These are editable inputs, not an optimisation search range.</p></section>
+        <section className="info-card"><div className="help-step-label">Step 2</div><h2>Enter hourly electricity tariffs</h2><p>Edit the 24 hourly retail import rates and 24 hourly feed-in rates in AUD/kWh, or retain the example values supplied with the client model. Rates can differ by hour. The Tariff Library is reference-only and does not automatically set these inputs.</p></section>
+        <section className="info-card"><div className="help-step-label">Step 3</div><h2>Enter total cost and financing</h2><p>Enter your total installation cost in AUD, annual interest rate (%), loan period (years) and daily electricity supply charge (AUD/day). The updated MATLAB model uses this total-cost assumption in its annual financing calculation; it is not an independent cost-per-kWh payback field.</p></section>
+        <section className="info-card"><div className="help-step-label">Step 4</div><h2>Run and interpret the result</h2><p>Django validates the inputs and executes the client-provided MATLAB calculation using GNU Octave. Review the selected battery capacity, annual payment, grid imports/exports and any warnings. Download the result CSV before leaving a private transient calculation.</p></section>
+        <section className="info-card"><div className="help-step-label">Model scope</div><h2>Know what is being evaluated</h2><p>The current model estimates annual costs for the user-selected configuration. It is not a guarantee of electricity-bill savings or a complete representation of every demand-charge and energy-management strategy in the client's published studies.</p></section>
+        <section className="info-card"><div className="help-step-label">Privacy</div><h2>Data and account handling</h2><p>The current updated calculation pathway uses transient processing. Other account and history features may be available for older retained records. Avoid uploading identifiable household information unnecessarily; download any transient results you need to keep.</p></section>
       </div>
-    </section>
-
-    <div className="notice page-card-space"><strong>Research tool:</strong>&nbsp; Outputs are decision-support estimates produced from the supplied algorithm and input data. They are not financial, electrical-installation, or engineering advice.</div>
+      <section className="card page-card-space help-troubleshooting">
+        <div className="card-header"><div><h2>Common issues</h2><p className="admin-card-subtitle">Checks before retrying a calculation.</p></div></div>
+        <div className="help-faq-list">
+          <details><summary>“Could not reach the Django backend”</summary><p>Confirm the deployed API is online and your Vercel NEXT_PUBLIC_API_BASE_URL environment variable points to the correct Django HTTPS origin. Check CORS for the deployed frontend domain.</p></details>
+          <details><summary>The annual workbook is rejected</summary><p>Use a supported file format and the agreed input columns. Review the specific validation error. The supplied client model expects annual PV and load profiles at compatible intervals.</p></details>
+          <details><summary>The calculation engine returns an error</summary><p>Check that the backend deployment includes the updated batt_cal_v1 adapter, GNU Octave and the same input contract as this frontend. Keep the current browser draft and retry after the issue is resolved.</p></details>
+          <details><summary>The result disappeared</summary><p>Transient calculations are not permanently saved by the updated-model pathway. Download the canonical CSV immediately after a successful calculation.</p></details>
+        </div>
+      </section>
+      <div className="notice page-card-space"><strong>Research prototype:</strong>&nbsp; Outputs depend on historical PV data, user inputs, tariff assumptions and the supplied client model. They are not a substitute for individual financial or electrical engineering advice.</div>
     </AppShell>
   </>;
 }

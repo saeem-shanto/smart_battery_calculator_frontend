@@ -118,7 +118,7 @@ export default function ResultsPage() {
             return;
           }
           if (hasTransientAttempt(fingerprint)) {
-            throw new Error("The previous private result is no longer available in this browser. Use Retry Calculation to run the optimisation again.");
+            throw new Error("The previous private result is no longer available in this browser. Use Retry Calculation to evaluate the selected configuration again.");
           }
           markTransientAttempt(fingerprint);
         }

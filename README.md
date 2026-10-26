@@ -1,58 +1,39 @@
-# N01 Smart Battery Calculator — Integrated frontend
+# N01 Smart Battery Calculator — Next.js frontend
 
-This archive contains the full Next.js frontend from the provided **Archive 2.zip**, with the existing homepage energy-flow illustration corrected in place. All existing calculator, accounts, admin, results, and help routes are preserved.
+The **frontend does not run or reproduce the client's MATLAB model**. All household PV, battery dispatch and financial results must originate from the Django/DRF backend running the client-supplied `batt_cal_v1.m` with GNU Octave.
 
-## What changed in this delivery
+## Architecture
 
-- `components/EnergyEcosystem.tsx`: removed unconditional fixed electricity movement. Connected active arrows to client V2-derived hourly dispatch examples. Added a visible grid node, separate Solar -> Grid (export) and Grid -> Home (import) routes, and five interactive scenario selectors. Only active directions animate.
-- `lib/energy-flow-scenarios.ts` (new): five defined hourly dispatch fixtures and route geometry matching the existing homepage SVG. Every path starts at its source and ends at its destination.
-- `src/lib/energy-flow.ts` (retained from the supplied ZIP): validates energy conservation, nonnegative flows, and import/export exclusivity; implements the client Version 2 *t >= 2* flow equations as **illustrative deterministic checks**, not a replacement for GNU Octave.
-- `app/globals.css`: adds responsive styles, keyboard focus indicators and accessible directional controls.
-- `tests/energy-flow-integration.test.cjs`: adds seven homepage-specific tests to the existing 16 tests.
-- `package.json`: adds `npm run test:energy-flow`.
-
-The original ZIP also contained unused standalone `demo/`, generated `dist/`, duplicate `Archive.zip`, and old unintegrated patch components. These have been omitted from the clean delivery. The homepage visualization is now part of the real Next.js application instead of a separate demo folder.
+1. Users enter 24 hourly load values (or an annual workbook), postcode, solar capacity, battery capacity, tariffs and installation finance assumptions.
+2. `lib/algorithm-v1.ts` defines **input defaults, field validation and display formatting only**. It does not compute battery dispatch, SoC, grid-import/export, costs, payback or an optimal battery size.
+3. `lib/api.ts` sends a generated scenario to `POST /api/v1/calculations/generated-annual-v1/` and a workbook to `POST /api/v1/calculations/client-workbook-v1/`. `lib/backend-client.ts` resolves the public API base URL and handles session/authentication.
+4. Django is expected to handle annual PV/load preparation, parameter mapping, executing MATLAB with GNU Octave, and returning the authoritative results. This backend behavior must be verified against the deployed backend source.
+5. The frontend `app/calculator/results/page.tsx` renders the values returned by Django. It does not calculate the financial results.
+6. The homepage energy animation (`components/EnergyEcosystem.tsx`) displays **static arrow direction examples**. It is expressly *not* derived from any live or historical calculation. No client MATLAB battery-dispatch equations remain in the frontend animation.
 
 ## Run locally
 
-Install dependencies with a normal connection to npm:
-
-```bash
-npm ci
+```sh
+npm ci --include=dev
+npm run verify:dependencies
 npm run dev:local
 ```
 
-Open **http://localhost:3000/** (homepage/dashboard) and select **Solar surplus**, **Solar to home**, **Battery + grid**, **Grid import**, and **Grid export** beneath the image. Observe the arrowheads and particles: import enters the home from the grid; export travels from solar PV to the grid.
+Open http://localhost:3000/ and use the calculation wizard. Set `NEXT_PUBLIC_API_BASE_URL` to the Django API base URL for integration with your backend (local development defaults to `http://127.0.0.1:8000/api/v1`).
 
-## Run automated tests
+## Tests and build
 
-```bash
+```sh
 npm run test:energy-flow
-```
-
-The test command compiles the pure TypeScript model into transient test outputs and runs 23 Node tests. A successful run exits with code 0. Generated `dist/` and `.flow-test-build/` output need not be committed.
-
-For a full app build, after installing npm dependencies:
-
-```bash
+npm run test:algorithm-v1
 npm run typecheck
 npm run build
 ```
 
-## Energy model and acceptance boundary
+Focused tests check the animation paths and the separation between UI and backend API. They **do not** prove MATLAB/Octave parity or successful execution of the deployed backend. `typecheck` and `build` require complete npm dependencies; they have not been confirmed in this assessment environment.
 
-The homepage is explicitly labelled **illustrative client V2 hourly flow (t >= 2), not a live calculation**. The five test cases use solar PV, household load, a starting battery SoC, and a selected capacity to calculate visual flow. They are not from an authenticated user's saved calculation. The client Version 2 provides annual summary values in the current Django response; its six hourly arrays (`pv`, `ld`, `Pbin`, `Pbout`, `imp`, `exp`) are **not** returned by the current results API. Therefore the homepage may illustrate physically correct directions, but real-hour animation for a particular user calculation would require a backend extension to return validated hourly flows.
+## Further reading
 
-The client MATLAB script initialises **hour 1** differently and may report negative grid import if early-hour solar exceeds load. The illustrative validation intentionally covers t >= 2. The animation code **does not alter MATLAB or Octave**, and no live backend numerical parity or client-approved acceptance fixtures are claimed.
-
-## Actual validation performed during this delivery
-
-- 23/23 focused tests passed (16 original model tests + 7 integrated-homepage tests).
-- The four changed TypeScript/TSX files were successfully parsed/transpiled with the installed TypeScript compiler.
-- Pure TypeScript logic compiled with `tsc --strict`.
-- A complete Next.js build was **not** verified in this environment because npm dependency installation did not complete. Run the full build on a workstation or CI before deployment.
-- Live browser/deployed version verification and client acceptance remain to be completed after deployment.
-
-## Deployment
-
-Do not overwrite existing secrets. Update only the frontend code, run tests and build, commit the changed files, and deploy to Vercel using your normal release process. Capture visual verification screenshots for the five scenarios. For formal change request C4 closure, compare hourly results against client-approved fixtures and record the tested release and acceptance decision.
+- `ARCHITECTURE_AUDIT_26OCT2026.md`: reviewed endpoints and remaining backend validation gaps.
+- `BUILD_FIX_README.md`: clean install and React type checking guidance.
+- `ENERGY_FLOW_CHANGELOG.md`: animation direction and model-simulation removal.

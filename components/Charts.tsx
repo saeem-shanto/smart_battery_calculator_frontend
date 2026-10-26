@@ -14,7 +14,7 @@ export function BillComparisonChart({ withoutBattery = 2400, withBattery = 1350,
   const ticks = [max, max * 2 / 3, max / 3, 0];
   return (
     <div className="chart-card">
-      <div className="chart-title-row"><h3>Electricity Bill Comparison</h3>{showInfo && <InfoTip text="Compares the no-battery baseline annual payment with the client model's optimised net annual payment for the recommended battery." label="About Electricity Bill Comparison" />}</div>
+      <div className="chart-title-row"><h3>Electricity Bill Comparison</h3>{showInfo && <InfoTip text="Compares annual baseline cost without a battery against the modelled annual cost for the selected battery size. The comparison includes annual financing costs when supplied by the backend." label="About Electricity Bill Comparison" />}</div>
       <div className="bar-chart">
         <div className="y-axis-label">Annual Bill ($)</div>
         <div className="bars-area">

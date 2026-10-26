@@ -31,7 +31,7 @@ export default function OpenGraphImage() {
           Use annual household load, solar PV and tariff information to compare battery sizing and estimated savings.
         </div>
         <div style={{ marginTop: 48, display: "flex", gap: 22, fontSize: 22, color: "#30445f" }}>
-          <span>Annual load profiles</span><span>•</span><span>Solar PV</span><span>•</span><span>Battery optimisation</span>
+          <span>Annual load profiles</span><span>•</span><span>Solar PV</span><span>•</span><span>Battery capacity assessment</span>
         </div>
       </div>
     ),

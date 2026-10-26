@@ -1,6 +1,6 @@
 import { Check } from "lucide-react";
 
-const labels = ["Data & Location", "Algorithm", "Battery Cost", "Results"] as const;
+const labels = ["Data & Location", "System & Tariffs", "Financial Settings", "Results"] as const;
 
 export function StepIndicator({ current }: { current: 1 | 2 | 3 | 4 }) {
   return (

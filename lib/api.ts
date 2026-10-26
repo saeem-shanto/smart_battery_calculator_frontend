@@ -95,26 +95,22 @@ export async function runWorkbookCalculation(draft: DraftCalculation, file: File
     "metadata",
     JSON.stringify({ frontend: "nextjs-direct-api", workflow: "client_workbook", retention_requested: Boolean(draft.retainData) }),
   );
-  if (draft.algorithmVersion === "batt_cal_v1") {
-    if (!validV1Inputs(draft.v1Inputs)) throw new Error("Finish configuring the updated MATLAB inputs in Steps 2 and 3.");
-    const v1 = draft.v1Inputs;
-    form.append("settings", JSON.stringify({
-      battery_capacity_kwh: v1.batteryCapacityKwh,
-      pv_capacity_kw: v1.pvCapacityKw,
-      interest_rate_percent: v1.interestRatePercent,
-      installation_cost_aud: v1.installationCostAud,
-      loan_period_years: v1.loanPeriodYears,
-      daily_supply_charge_aud: v1.dailySupplyChargeAud,
-      retail_tariff_24h: v1.retailTariff24h,
-      feed_in_tariff_24h: v1.feedInTariff24h,
-    }));
-    return readJson<CalculationResponse>(
-      await optionalUserFetch("/calculations/client-workbook-v1/", { method: "POST", body: form }),
-    );
+  if (draft.algorithmVersion !== "batt_cal_v1" || !validV1Inputs(draft.v1Inputs)) {
+    throw new Error("Finish configuring the updated MATLAB inputs in Steps 2 and 3.");
   }
-  form.append("battery_installed_cost_per_kwh", String(draft.batteryInstalledCostPerKwh ?? 1000));
+  const v1 = draft.v1Inputs;
+  form.append("settings", JSON.stringify({
+    battery_capacity_kwh: v1.batteryCapacityKwh,
+    pv_capacity_kw: v1.pvCapacityKw,
+    interest_rate_percent: v1.interestRatePercent,
+    installation_cost_aud: v1.installationCostAud,
+    loan_period_years: v1.loanPeriodYears,
+    daily_supply_charge_aud: v1.dailySupplyChargeAud,
+    retail_tariff_24h: v1.retailTariff24h,
+    feed_in_tariff_24h: v1.feedInTariff24h,
+  }));
   return readJson<CalculationResponse>(
-    await optionalUserFetch("/calculations/client-workbook/", { method: "POST", body: form }),
+    await optionalUserFetch("/calculations/client-workbook-v1/", { method: "POST", body: form }),
   );
 }
 

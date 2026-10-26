@@ -3,7 +3,7 @@ import { publicPageMetadata } from "@/lib/seo";
 
 export const metadata = publicPageMetadata({
   title: "Solar Battery Sizing Calculator",
-  description: "Start a solar battery sizing calculation using annual household load and PV profile data. Validate your energy profile before running the optimisation.",
+  description: "Start a solar battery sizing calculation using annual household load and PV profile data. Validate your profile before evaluating a selected battery capacity.",
   path: "/calculator/load-solar",
   keywords: ["solar battery sizing calculator", "annual load profile", "PV load profile calculator"],
 });

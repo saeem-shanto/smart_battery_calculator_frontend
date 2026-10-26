@@ -74,3 +74,12 @@ export function dailyConsumption(loads: number[]): number | null {
   return loads.reduce((sum, v) => sum + v, 0);
 }
 
+
+/** Human-readable 24-hour tariff slot, using the same hour index as MATLAB. */
+export function hourRange(hour: number): string {
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
+    throw new RangeError("Hour index must be an integer from 0 to 23.");
+  }
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(hour)}:00–${pad((hour + 1) % 24)}:00`;
+}

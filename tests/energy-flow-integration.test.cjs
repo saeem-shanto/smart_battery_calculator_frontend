@@ -15,7 +15,7 @@ const expectations = {
  'grid-export': ['solarToHome','solarToGrid'],
 };
 
-test('all five homepage scenarios use client V2-derived one-hour dispatch, not annual totals', () => {
+test('all homepage scenarios are static direction examples, not calculated energy', () => {
  assert.equal(ENERGY_FLOW_SCENARIOS.length, 5);
  for (const scenario of ENERGY_FLOW_SCENARIOS) {
   const {flow} = getScenario(scenario.key);
@@ -32,7 +32,7 @@ test('solar surplus includes proper positive solar -> grid export and never grid
 
 test('grid import starts at the grid and moves toward the home', () => {
  const {flow} = getScenario('grid-import');
- assert.equal(flow.gridToHome, 3);
+ assert.equal(flow.gridToHome, 1);
  const p = HERO_ROUTE_PATHS.gridToHome;
  assert.match(p, /^M 684 145 /);
  assert.match(p, /646 247$/);
@@ -40,7 +40,7 @@ test('grid import starts at the grid and moves toward the home', () => {
 
 test('grid export starts at solar and moves toward the grid (opposite route to import)', () => {
  const {flow} = getScenario('grid-export');
- assert.equal(flow.solarToGrid, 5);
+ assert.equal(flow.solarToGrid, 1);
  assert.equal(flow.gridToHome, 0);
  assert.match(HERO_ROUTE_PATHS.solarToGrid, /^M 330 190 /);
  assert.match(HERO_ROUTE_PATHS.solarToGrid, /679 139$/);

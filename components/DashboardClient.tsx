@@ -99,7 +99,7 @@ export function DashboardClient() {
         <div className="landing-hero-copy">
           <div className="hero-kicker">Residential solar battery calculator</div>
           <h1>Size your home battery <span>with real energy data.</span></h1>
-          <p className="hero-lead">Upload a full-year household load and PV profile. The calculator runs the client optimisation model and reports battery size, energy flows and annual cost estimates.</p>
+          <p className="hero-lead">Enter your postcode and 24 hourly consumption values, or upload an annual workbook. Evaluate a chosen battery and solar PV size with the updated client calculation model.</p>
 
           <div className="dashboard-hero-actions">
             <button className="btn btn-primary hero-primary-action" type="button" onClick={startNew}><Calculator size={18}/> Start a calculation <ArrowRight size={17}/></button>
@@ -126,9 +126,9 @@ export function DashboardClient() {
       </section>
 
       <section className="feature-grid landing-feature-grid" aria-label="Calculator capabilities">
-        <div className="feature-card landing-feature-card"><div className="feature-topline"><div className="icon-bubble green"><FileSpreadsheet size={25}/></div></div><h3>Use your annual profile</h3><p>Validate the household load and solar generation data used in the calculation.</p></div>
-        <div className="feature-card landing-feature-card"><div className="feature-topline"><div className="icon-bubble purple"><BatteryCharging size={25}/></div></div><h3>Run the client model</h3><p>The supplied MATLAB optimisation runs through GNU Octave on the backend.</p></div>
-        <div className="feature-card landing-feature-card"><div className="feature-topline"><div className="icon-bubble gold"><CircleDollarSign size={25}/></div></div><h3>Review the result</h3><p>See battery capacity, annual payment, import, export, self-consumption and payback estimates.</p></div>
+        <div className="feature-card landing-feature-card"><div className="feature-topline"><div className="icon-bubble green"><FileSpreadsheet size={25}/></div></div><h3>Use your annual profile</h3><p>Enter a typical 24-hour load and generate location-based solar data, or validate an annual workbook.</p></div>
+        <div className="feature-card landing-feature-card"><div className="feature-topline"><div className="icon-bubble purple"><BatteryCharging size={25}/></div></div><h3>Run the client model</h3><p>The selected-capacity MATLAB calculation is executed through GNU Octave on the Django backend.</p></div>
+        <div className="feature-card landing-feature-card"><div className="feature-topline"><div className="icon-bubble gold"><CircleDollarSign size={25}/></div></div><h3>Review the result</h3><p>Review the selected battery capacity, modelled annual payment, grid exchange and payback estimate.</p></div>
       </section>
 
       {accountWarning && <div className="notice dashboard-notice" role="status">{accountWarning}</div>}

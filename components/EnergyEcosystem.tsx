@@ -186,7 +186,7 @@ export const EnergyEcosystem = memo(function EnergyEcosystem() {
         <strong>{scenario.label}:</strong>
         <span>{routes.map(route => `${route.from} → ${route.to}`).join(" · ") || "No active flow"}</span>
       </div>
-      <span className="energy-flow-provenance" title={scenario.description}>Illustrative client V2 hourly flow (t ≥ 2), not a live calculation</span>
+      <span className="energy-flow-provenance" title={scenario.description}>Static direction example only — not a live calculation or MATLAB simulation</span>
     </div>
   );
 });

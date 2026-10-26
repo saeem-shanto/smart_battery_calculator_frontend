@@ -225,7 +225,7 @@ export default function LoadSolarPage() {
   return (
     <AppShell>
       <form onSubmit={submit} noValidate>
-        <div className="step-heading"><h1>New Calculation</h1><p>Step 1 of 4 · Generate annual solar and household consumption data, or upload a workbook.</p></div>
+        <div className="step-heading"><h1>New Calculation</h1><p>Step 1 of 4 · Prepare annual PV and household load data, or upload an annual workbook.</p></div>
         <StepIndicator current={1} />
 
         <section className="section-card n01-methods" aria-label="Input method">
