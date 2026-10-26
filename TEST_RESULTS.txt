@@ -1,0 +1,109 @@
+TAP version 13
+# Subtest: solar serves home before other pathways
+ok 1 - solar serves home before other pathways
+  ---
+  duration_ms: 1.935553
+  type: 'test'
+  ...
+# Subtest: surplus PV charges battery, then exports the remainder
+ok 2 - surplus PV charges battery, then exports the remainder
+  ---
+  duration_ms: 0.252342
+  type: 'test'
+  ...
+# Subtest: full battery sends export to grid (not grid to home)
+ok 3 - full battery sends export to grid (not grid to home)
+  ---
+  duration_ms: 0.186004
+  type: 'test'
+  ...
+# Subtest: night-time import flows GRID -> HOME
+ok 4 - night-time import flows GRID -> HOME
+  ---
+  duration_ms: 0.18293
+  type: 'test'
+  ...
+# Subtest: battery discharges to home before residual grid import
+ok 5 - battery discharges to home before residual grid import
+  ---
+  duration_ms: 0.283007
+  type: 'test'
+  ...
+# Subtest: zero-energy interval animates nothing
+ok 6 - zero-energy interval animates nothing
+  ---
+  duration_ms: 0.176801
+  type: 'test'
+  ...
+# Subtest: curtailment is not misrepresented as export
+ok 7 - curtailment is not misrepresented as export
+  ---
+  duration_ms: 0.195579
+  type: 'test'
+  ...
+# Subtest: rejects simultaneous import and export
+ok 8 - rejects simultaneous import and export
+  ---
+  duration_ms: 0.464735
+  type: 'test'
+  ...
+# Subtest: rejects physically impossible energy balances and negative flows
+ok 9 - rejects physically impossible energy balances and negative flows
+  ---
+  duration_ms: 0.510873
+  type: 'test'
+  ...
+# Subtest: rejects simultaneous battery charge and discharge
+ok 10 - rejects simultaneous battery charge and discharge
+  ---
+  duration_ms: 0.537853
+  type: 'test'
+  ...
+# Subtest: every arrow endpoint has correct direction, especially grid import and export
+ok 11 - every arrow endpoint has correct direction, especially grid import and export
+  ---
+  duration_ms: 0.367732
+  type: 'test'
+  ...
+# Subtest: client V2 t>=2: charge limited by beta*x and export leftover
+ok 12 - client V2 t>=2: charge limited by beta*x and export leftover
+  ---
+  duration_ms: 0.370336
+  type: 'test'
+  ...
+# Subtest: client V2 t>=2: max SoC and 5 kWh/hour export cap
+ok 13 - client V2 t>=2: max SoC and 5 kWh/hour export cap
+  ---
+  duration_ms: 0.190811
+  type: 'test'
+  ...
+# Subtest: client V2 t>=2: discharge limited by SoC and efficiency
+ok 14 - client V2 t>=2: discharge limited by SoC and efficiency
+  ---
+  duration_ms: 0.903523
+  type: 'test'
+  ...
+# Subtest: client V2 t>=2: depleted battery cannot discharge, imports grid supply
+ok 15 - client V2 t>=2: depleted battery cannot discharge, imports grid supply
+  ---
+  duration_ms: 0.12909
+  type: 'test'
+  ...
+# Subtest: rejects invalid battery SoC and capacity for illustrative step
+ok 16 - rejects invalid battery SoC and capacity for illustrative step
+  ---
+  duration_ms: 0.152935
+  type: 'test'
+  ...
+1..16
+# tests 16
+# suites 0
+# pass 16
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 71.785169
+TypeScript: pure module strict compilation PASSED
+React TSX: static type-check with minimal local React declarations PASSED (not a full Next.js build)
+Tests: 16/16 PASSED

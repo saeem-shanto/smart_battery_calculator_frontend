@@ -1,12 +1,16 @@
 "use client";
 
-import { memo, useEffect, useRef, type PointerEvent } from "react";
+import { memo, useEffect, useId, useRef, useState, type PointerEvent } from "react";
+import { activeFlowRoutes } from "@/src/lib/energy-flow";
+import { ENERGY_FLOW_SCENARIOS, HERO_ROUTE_PATHS, getScenario, type ScenarioKey } from "@/lib/energy-flow-scenarios";
 
-const warmPath = "M118 98 C170 120 190 165 226 206";
-const chargePath = "M314 286 C348 306 380 307 416 286";
-const homePath = "M474 286 C512 278 542 258 575 238";
+
 
 export const EnergyEcosystem = memo(function EnergyEcosystem() {
+  const markerBase = useId().replace(/:/g, "");
+  const [scenarioKey, setScenarioKey] = useState<ScenarioKey>("solar-surplus");
+  const { scenario, flow } = getScenario(scenarioKey);
+  const routes = activeFlowRoutes(flow);
   const rootRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<number | null>(null);
 
@@ -43,11 +47,11 @@ export const EnergyEcosystem = memo(function EnergyEcosystem() {
   return (
     <div
       ref={rootRef}
-      className="energy-ecosystem"
+      className="energy-ecosystem energy-ecosystem--verified"
       onPointerMove={move}
       onPointerLeave={reset}
-      role="img"
-      aria-label="Animated energy flow from sunlight to solar panels, battery storage and a modern home"
+      role="region"
+      aria-label="Illustrative hourly solar, battery, home and grid energy-flow directions. Select a scenario to verify import and export."
     >
       <div className="energy-orb energy-orb-warm" />
       <div className="energy-orb energy-orb-cyan" />
@@ -123,7 +127,7 @@ export const EnergyEcosystem = memo(function EnergyEcosystem() {
             <rect x="402" y="232" width="76" height="112" rx="18" fill="url(#batteryBody)" />
             <rect x="424" y="220" width="32" height="15" rx="6" fill="#294a59" />
             <rect x="417" y="249" width="46" height="66" rx="12" fill="#102937" stroke="#294b58" />
-            <rect x="423" y="278" width="34" height="30" rx="8" fill="url(#cyanGlow)" opacity="0.82" className="battery-charge" />
+            <rect x="423" y="278" width="34" height="30" rx="8" fill="url(#cyanGlow)" opacity="0.82" className={flow.solarToBattery > 0 ? "battery-charge" : "battery-charge battery-charge--resting"} />
             <path d="M438 258h7l-5 10h7l-12 17 4-12h-7z" fill="#a5f5ff" />
             <circle cx="440" cy="327" r="4" fill="#62e9c2" />
           </g>
@@ -139,48 +143,50 @@ export const EnergyEcosystem = memo(function EnergyEcosystem() {
             <path d="M552 221 L589 194 L623 214" fill="none" stroke="#55cdb3" strokeWidth="4" strokeLinecap="round" opacity="0.65" />
           </g>
 
-          <g className="energy-lines">
-            <path d={warmPath} fill="none" stroke="#ffbd45" strokeWidth="3" strokeLinecap="round" opacity="0.30" />
-            <path d={warmPath} fill="none" stroke="#ffd978" strokeWidth="2" strokeLinecap="round" strokeDasharray="5 11" className="energy-dash warm-dash" />
-
-            <path d={chargePath} fill="none" stroke="#39d8ef" strokeWidth="9" strokeLinecap="round" opacity="0.10" />
-            <path d={chargePath} fill="none" stroke="url(#cyanGlow)" strokeWidth="3" strokeLinecap="round" />
-
-            <path d={homePath} fill="none" stroke="#39d8ef" strokeWidth="9" strokeLinecap="round" opacity="0.10" />
-            <path d={homePath} fill="none" stroke="url(#cyanGlow)" strokeWidth="3" strokeLinecap="round" />
+          <g className="grid-tower" aria-hidden="true">
+            <path d="M672 174 L687 106 L705 174 M679 141 H699 M675 158 H701 M687 106 L702 158 M705 174 L675 158 M672 174 L699 141 M696 132 L705 119" stroke="#476678" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <path d="M674 124 H704 M668 142 H711" stroke="#7895a1" strokeWidth="3" strokeLinecap="round"/>
+            <circle cx="686" cy="107" r="4" fill="#73b1c1" />
           </g>
 
-          <g className="energy-particles" filter="url(#smallGlow)">
-            <circle r="4.6" fill="#ffd56c" className="energy-particle">
-              <animateMotion dur="3.8s" repeatCount="indefinite" path={warmPath} />
-            </circle>
-            <circle r="3.8" fill="#fff0a5" className="energy-particle">
-              <animateMotion dur="3.8s" begin="-1.9s" repeatCount="indefinite" path={warmPath} />
-            </circle>
-            <circle r="4.5" fill="#79ecff" className="energy-particle">
-              <animateMotion dur="2.1s" repeatCount="indefinite" path={chargePath} />
-            </circle>
-            <circle r="3.5" fill="#c6f8ff" className="energy-particle">
-              <animateMotion dur="2.1s" begin="-1.05s" repeatCount="indefinite" path={chargePath} />
-            </circle>
-            <circle r="4.4" fill="#79ecff" className="energy-particle">
-              <animateMotion dur="2.4s" repeatCount="indefinite" path={homePath} />
-            </circle>
-            <circle r="3.4" fill="#c6f8ff" className="energy-particle">
-              <animateMotion dur="2.4s" begin="-1.2s" repeatCount="indefinite" path={homePath} />
-            </circle>
+          <defs>
+            {routes.map(route => (
+              <marker key={route.key} id={`${markerBase}-hero-arrow-${route.key}`} markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse" viewBox="0 0 9 8">
+                <path d="M0 0 L9 4 L0 8 Z" fill={route.color}/>
+              </marker>
+            ))}
+          </defs>
+          <g className="energy-lines" role="presentation">
+            {routes.map(route => (
+              <g key={route.key}>
+                <path d={HERO_ROUTE_PATHS[route.key]} fill="none" stroke={route.color} strokeWidth="4.5"
+                  strokeLinecap="round" opacity="0.95" markerEnd={`url(#${markerBase}-hero-arrow-${route.key})`} />
+                <circle r="5" fill={route.color} className="energy-particle">
+                  <animateMotion dur="2.6s" repeatCount="indefinite" path={HERO_ROUTE_PATHS[route.key]}/>
+                </circle>
+              </g>
+            ))}
           </g>
         </svg>
 
-        <div className="energy-label energy-label-solar"><span />Solar capture</div>
-        <div className="energy-label energy-label-battery"><span />Storage</div>
-        <div className="energy-label energy-label-home"><span />Home demand</div>
+        <div className="energy-label energy-label-solar"><span />Solar PV</div>
+        <div className="energy-label energy-label-battery"><span />Battery</div>
+        <div className="energy-label energy-label-home"><span />Home</div>
+        <div className="energy-label energy-label-grid"><span />Grid</div>
       </div>
 
-      <div className="energy-flow-legend" aria-hidden="true">
-        <span><i className="legend-dot warm" />Sunlight</span>
-        <span><i className="legend-dot cyan" />Electricity</span>
+      <div className="energy-flow-controls" role="group" aria-label="Choose an illustrative energy-flow scenario">
+        {ENERGY_FLOW_SCENARIOS.map(item => (
+          <button key={item.key} type="button" aria-pressed={scenarioKey === item.key}
+            className={`energy-flow-scenario${scenarioKey === item.key ? " is-active" : ""}`}
+            onClick={() => setScenarioKey(item.key)}>{item.label}</button>
+        ))}
       </div>
+      <div className="energy-flow-legend" role="status" aria-live="polite">
+        <strong>{scenario.label}:</strong>
+        <span>{routes.map(route => `${route.from} → ${route.to}`).join(" · ") || "No active flow"}</span>
+      </div>
+      <span className="energy-flow-provenance" title={scenario.description}>Illustrative client V2 hourly flow (t ≥ 2), not a live calculation</span>
     </div>
   );
 });

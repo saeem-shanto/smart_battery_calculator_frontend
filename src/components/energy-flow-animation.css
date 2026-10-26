@@ -1,0 +1,27 @@
+.n01-energy-flow {
+  --n01-ink: #1a2d37;
+  --n01-border: #dbe5e8;
+  color: var(--n01-ink);
+  border: 1px solid var(--n01-border);
+  border-radius: 16px;
+  padding: clamp(14px, 2vw, 24px);
+  background: #fff;
+  font-family: inherit;
+}
+.n01-energy-flow__header h3 { margin: 0; font-size: 1.18rem; font-weight: 700; }
+.n01-energy-flow__header p { margin: 6px 0 0; color: #536872; font-size: .9rem; }
+.n01-energy-flow__svg { display: block; width: 100%; height: auto; max-height: 460px; margin-block: 10px; }
+.n01-energy-flow__node rect { fill: #f6fafb; stroke: #9fb4bc; stroke-width: 2; }
+.n01-energy-flow__node text { fill: #203640; font-family: inherit; font-size: 18px; }
+.n01-energy-flow__node .n01-energy-flow__node-name { font-size: 23px; font-weight: 700; }
+.n01-energy-flow__active-path { stroke-dasharray: 10 7; animation: n01-energy-move 1.1s linear infinite; }
+@keyframes n01-energy-move { to { stroke-dashoffset: -17; } }
+.n01-energy-flow__legend { margin: 6px 0 0; padding: 0; display: grid; gap: 9px; list-style: none; }
+.n01-energy-flow__legend li { display: flex; align-items: center; gap: 9px; font-size: .9rem; }
+.n01-energy-flow__legend li strong { margin-left: auto; font-variant-numeric: tabular-nums; }
+.n01-energy-flow__swatch { width: 11px; height: 11px; border-radius: 100%; flex: none; }
+.n01-energy-flow__notice { padding: 16px; border-radius: 10px; background: #f0f5f8; color: #475963; }
+@media (prefers-reduced-motion: reduce) {
+  .n01-energy-flow__active-path { animation: none; stroke-dasharray: none; }
+  .n01-energy-flow__moving-dot { display: none; }
+}

@@ -1,0 +1,152 @@
+
+> smart-battery-calculator-ui@1.6.0 test:energy-flow
+> tsc --target ES2022 --module commonjs --strict --skipLibCheck --outDir dist src/lib/energy-flow.ts && tsc --target ES2022 --module commonjs --strict --skipLibCheck --outDir .flow-test-build lib/energy-flow-scenarios.ts src/lib/energy-flow.ts && node --test tests/energy-flow.test.mjs tests/energy-flow-integration.test.cjs
+
+TAP version 13
+# Subtest: all five homepage scenarios use client V2-derived one-hour dispatch, not annual totals
+ok 1 - all five homepage scenarios use client V2-derived one-hour dispatch, not annual totals
+  ---
+  duration_ms: 1.543015
+  type: 'test'
+  ...
+# Subtest: solar surplus includes proper positive solar -> grid export and never grid import
+ok 2 - solar surplus includes proper positive solar -> grid export and never grid import
+  ---
+  duration_ms: 0.128199
+  type: 'test'
+  ...
+# Subtest: grid import starts at the grid and moves toward the home
+ok 3 - grid import starts at the grid and moves toward the home
+  ---
+  duration_ms: 0.2371
+  type: 'test'
+  ...
+# Subtest: grid export starts at solar and moves toward the grid (opposite route to import)
+ok 4 - grid export starts at solar and moves toward the grid (opposite route to import)
+  ---
+  duration_ms: 0.184422
+  type: 'test'
+  ...
+# Subtest: battery discharge delivers power to the home before residual grid import
+ok 5 - battery discharge delivers power to the home before residual grid import
+  ---
+  duration_ms: 1.175333
+  type: 'test'
+  ...
+# Subtest: all active arrows use unique direction-specific physical paths
+ok 6 - all active arrows use unique direction-specific physical paths
+  ---
+  duration_ms: 0.136982
+  type: 'test'
+  ...
+# Subtest: real dashboard integrates the verified animation with accessible scenario buttons
+ok 7 - real dashboard integrates the verified animation with accessible scenario buttons
+  ---
+  duration_ms: 0.349145
+  type: 'test'
+  ...
+# Subtest: solar serves home before other pathways
+ok 8 - solar serves home before other pathways
+  ---
+  duration_ms: 1.525058
+  type: 'test'
+  ...
+# Subtest: surplus PV charges battery, then exports the remainder
+ok 9 - surplus PV charges battery, then exports the remainder
+  ---
+  duration_ms: 0.181517
+  type: 'test'
+  ...
+# Subtest: full battery sends export to grid (not grid to home)
+ok 10 - full battery sends export to grid (not grid to home)
+  ---
+  duration_ms: 0.121079
+  type: 'test'
+  ...
+# Subtest: night-time import flows GRID -> HOME
+ok 11 - night-time import flows GRID -> HOME
+  ---
+  duration_ms: 0.159415
+  type: 'test'
+  ...
+# Subtest: battery discharges to home before residual grid import
+ok 12 - battery discharges to home before residual grid import
+  ---
+  duration_ms: 0.173266
+  type: 'test'
+  ...
+# Subtest: zero-energy interval animates nothing
+ok 13 - zero-energy interval animates nothing
+  ---
+  duration_ms: 0.132015
+  type: 'test'
+  ...
+# Subtest: curtailment is not misrepresented as export
+ok 14 - curtailment is not misrepresented as export
+  ---
+  duration_ms: 0.135439
+  type: 'test'
+  ...
+# Subtest: rejects simultaneous import and export
+ok 15 - rejects simultaneous import and export
+  ---
+  duration_ms: 0.350898
+  type: 'test'
+  ...
+# Subtest: rejects physically impossible energy balances and negative flows
+ok 16 - rejects physically impossible energy balances and negative flows
+  ---
+  duration_ms: 0.331408
+  type: 'test'
+  ...
+# Subtest: rejects simultaneous battery charge and discharge
+ok 17 - rejects simultaneous battery charge and discharge
+  ---
+  duration_ms: 0.343517
+  type: 'test'
+  ...
+# Subtest: every arrow endpoint has correct direction, especially grid import and export
+ok 18 - every arrow endpoint has correct direction, especially grid import and export
+  ---
+  duration_ms: 0.303267
+  type: 'test'
+  ...
+# Subtest: client V2 t>=2: charge limited by beta*x and export leftover
+ok 19 - client V2 t>=2: charge limited by beta*x and export leftover
+  ---
+  duration_ms: 0.25796
+  type: 'test'
+  ...
+# Subtest: client V2 t>=2: max SoC and 5 kWh/hour export cap
+ok 20 - client V2 t>=2: max SoC and 5 kWh/hour export cap
+  ---
+  duration_ms: 0.15622
+  type: 'test'
+  ...
+# Subtest: client V2 t>=2: discharge limited by SoC and efficiency
+ok 21 - client V2 t>=2: discharge limited by SoC and efficiency
+  ---
+  duration_ms: 0.904904
+  type: 'test'
+  ...
+# Subtest: client V2 t>=2: depleted battery cannot discharge, imports grid supply
+ok 22 - client V2 t>=2: depleted battery cannot discharge, imports grid supply
+  ---
+  duration_ms: 0.103532
+  type: 'test'
+  ...
+# Subtest: rejects invalid battery SoC and capacity for illustrative step
+ok 23 - rejects invalid battery SoC and capacity for illustrative step
+  ---
+  duration_ms: 0.119216
+  type: 'test'
+  ...
+1..23
+# tests 23
+# suites 0
+# pass 23
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 72.135322

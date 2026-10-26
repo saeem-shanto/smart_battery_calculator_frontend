@@ -1116,3 +1116,94 @@ button:active:not(:disabled), .btn:active:not(:disabled) { transform: translateY
 .v1-review-grid strong { font-size:18px;color:#142944;overflow-wrap:anywhere }
 @media(max-width:900px){.v1-review-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:640px){.v1-field-grid,.v1-finance-preview,.v1-tariff-summary,.v1-review-grid{grid-template-columns:1fr}.v1-editor-head{align-items:flex-start;flex-direction:column}}
+
+/* Verified energy-flow directions on the existing homepage visual (N01 change C4).
+ * The diagram uses labelled, synthetic one-hour Version 2 examples: it is not
+ * a live user's model result and never treats annual totals as hourly data. */
+.energy-ecosystem--verified {
+  aspect-ratio: auto;
+  min-height: 428px;
+  padding-bottom: 0;
+}
+.energy-ecosystem--verified .energy-scene-tilt { bottom: 93px; }
+.energy-ecosystem--verified .energy-scene { overflow: visible; }
+.energy-ecosystem--verified .battery-charge--resting { animation: none; opacity: 0.42; }
+.energy-ecosystem--verified .energy-flow-controls {
+  position: absolute;
+  z-index: 8;
+  bottom: 52px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: center;
+}
+.energy-flow-scenario {
+  appearance: none;
+  font-family: inherit;
+  padding: 7px 9px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #32545e;
+  border: 1px solid #cbded9;
+  border-radius: 7px;
+  background: #fff;
+  cursor: pointer;
+}
+.energy-flow-scenario.is-active,
+.energy-flow-scenario[aria-pressed="true"] {
+  color: #07573d;
+  background: #e1f6ed;
+  border-color: #1b9d6e;
+}
+.energy-flow-scenario:focus-visible { outline: 3px solid #288acf; outline-offset: 2px; }
+.energy-ecosystem--verified .energy-flow-legend {
+  left: 16px;
+  right: 16px;
+  bottom: 22px;
+  justify-content: center;
+  flex-wrap: wrap;
+  max-width: calc(100% - 32px);
+  font-weight: 650;
+  font-size: 10px;
+  white-space: normal;
+}
+.energy-ecosystem--verified .energy-flow-provenance {
+  position: absolute;
+  z-index: 7;
+  left: 16px;
+  right: 16px;
+  bottom: 4px;
+  color: #617982;
+  text-align: center;
+  font-size: 9px;
+}
+.energy-label-grid { right: 2%; top: 31%; }
+.energy-ecosystem--verified .energy-label-grid span { background: #315bd0; }
+@media (max-width: 780px) {
+  .energy-ecosystem--verified { min-height: 392px; aspect-ratio: auto; }
+  .energy-ecosystem--verified .energy-scene-tilt { bottom: 109px; }
+  .energy-ecosystem--verified .energy-flow-controls { bottom: 56px; gap: 4px; }
+  .energy-flow-scenario { font-size: 9px; padding: 6px 8px; }
+  .energy-ecosystem--verified .energy-flow-legend { display: flex; bottom: 24px; font-size: 9px; padding: 3px 5px; }
+}
+@media (max-width: 520px) {
+  .energy-ecosystem--verified { min-height: 360px; }
+  .energy-ecosystem--verified .energy-scene-tilt { bottom: 122px; }
+  .energy-ecosystem--verified .energy-flow-controls { bottom: 55px; left: 6px; right: 6px; }
+  .energy-flow-scenario { padding: 5px 6px; font-size: 9px; }
+  .energy-ecosystem--verified .energy-flow-legend { left: 6px; right: 6px; max-width: calc(100% - 12px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .energy-ecosystem--verified .energy-particle { display: none; }
+}
+/* Keep the backend health badge from covering the scenario buttons/caption. */
+.landing-hero-visual .energy-ecosystem--verified + .hero-backend-status {
+  position: relative;
+  right: auto;
+  bottom: auto;
+  width: fit-content;
+  max-width: 100%;
+  margin: 6px auto 0;
+}

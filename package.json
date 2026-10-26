@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start --hostname 0.0.0.0",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf .next"
+    "clean": "rm -rf .next",
+    "test:energy-flow": "tsc --target ES2022 --module commonjs --strict --skipLibCheck --outDir dist src/lib/energy-flow.ts && tsc --target ES2022 --module commonjs --strict --skipLibCheck --outDir .flow-test-build lib/energy-flow-scenarios.ts src/lib/energy-flow.ts && node --test tests/energy-flow.test.mjs tests/energy-flow-integration.test.cjs"
   },
   "dependencies": {
     "@vercel/speed-insights": "^2.0.0",
