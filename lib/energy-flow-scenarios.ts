@@ -5,7 +5,7 @@
  * reproduce the client MATLAB battery simulation. They are NOT user results.
  * Actual dispatch and financial results must be provided by Django/Octave.
  */
-import { activeFlowRoutes, type EnergyFlow, type EnergyRoute } from '../src/lib/energy-flow';
+import { activeFlowRoutes, type EnergyRouteFlags, type EnergyRoute } from '../src/lib/energy-flow';
 
 export type ScenarioKey = 'solar-surplus' | 'solar-only' | 'battery-discharge' | 'grid-import' | 'grid-export';
 
@@ -13,7 +13,7 @@ interface EnergyFlowScenario {
   key: ScenarioKey;
   label: string;
   description: string;
-  readonly flow: EnergyFlow;
+  readonly flow: EnergyRouteFlags;
 }
 
 // Values are 0/1 flags for which arrows should animate; not simulated energy.
@@ -39,7 +39,7 @@ export const HERO_ROUTE_PATHS: Readonly<Record<EnergyRoute, string>> = {
   solarToGrid: 'M 330 190 C 425 79 606 66 679 139',
 };
 
-export function getScenario(key: ScenarioKey): { scenario: EnergyFlowScenario; flow: EnergyFlow } {
+export function getScenario(key: ScenarioKey): { scenario: EnergyFlowScenario; flow: EnergyRouteFlags } {
   const scenario = ENERGY_FLOW_SCENARIOS.find(item => item.key === key);
   if (!scenario) throw new Error(`Unknown static energy-flow scenario: ${key}`);
   activeFlowRoutes(scenario.flow); // validate display fixture, never run battery model
